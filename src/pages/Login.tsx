@@ -6,33 +6,47 @@ import { useTheme } from "../context/ThemeContext";
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
-  const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro('');
     setCarregando(true);
   
-    setTimeout(() => {
-      const usuarioFormatado = usuario.trim();
-      
-      // Recupera o tema específico deste usuário
-      const temaUsuario = localStorage.getItem(`theme_${usuarioFormatado}`) as 'light' | 'dark' || 'light';
-      
-      // Aplica o tema ANTES de entrar no sistema
-      setTheme(temaUsuario);
-      
-      localStorage.setItem('userName', usuarioFormatado);
-      localStorage.setItem('userSetor', 'TI');
-      localStorage.setItem('userCargo', 'Analista'); // Cargo definido para o usuário logado
+    try {
+      const response = await fetch('http://192.168.2.155:7000/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim(), senha }),
+      });
 
+      if (!response.ok) {
+        throw new Error('E-mail ou senha inválidos.');
+      }
+
+      const data = await response.json();
+      
+      // Armazena o token JWT para autenticação Bearer
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('userEmail', email.trim());
+
+      // Opcional: Aqui você pode buscar dados adicionais do usuário em /usuarios/me [cite: 62]
+      // para preencher localStorage como setar empresaAcesso, cargo, etc.
+
+      setTheme('light'); // Ou recupere o tema do banco após logar
       setCarregando(false);
-      navigate('/home', { replace: true }); 
-    }, 1000);
+      navigate('/home', { replace: true });
+      
+    } catch (err: any) {
+      setErro(err.message || 'Erro ao conectar com o servidor.');
+      setCarregando(false);
+    }
   };
 
   return (
@@ -51,13 +65,14 @@ export const Login: React.FC = () => {
           )}
 
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Usuário ou E-mail</label>
+            <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">E-mail</label>
             <input
-              type="text"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-              placeholder="Usuário ou usuario@email.com.br"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@email.com.br"
               className="w-full px-4 py-3 bg-gray-50 border border-[#dee2e6] rounded-sm text-sm outline-none focus:border-[#E95C13] focus:ring-1 focus:ring-[#E95C13] transition-all text-gray-800"
+              required
             />
           </div>
 
@@ -70,6 +85,7 @@ export const Login: React.FC = () => {
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 bg-gray-50 border border-[#dee2e6] rounded-sm text-sm outline-none focus:border-[#E95C13] focus:ring-1 focus:ring-[#E95C13] transition-all pr-12 text-gray-800"
+                required
               />
               <button
                 type="button"
@@ -93,6 +109,7 @@ export const Login: React.FC = () => {
         <div className="text-center text-xs text-gray-500">
           Não possui cadastro?{' '}
           <button
+            type="button"
             onClick={() => navigate('/cadastro')}
             className="text-[#E95C13] hover:underline font-bold transition-all"
           >
