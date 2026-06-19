@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Pencil, Lock } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -12,17 +12,46 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
   const { theme } = useTheme();
   const modalRef = useRef<HTMLDivElement>(null);
   
-  const [email, setEmail] = useState('usuario@engebag.com.br');
-  const userSetor = localStorage.getItem('userSetor') || 'TI';
-  const userCargo = localStorage.getItem('userCargo') || 'Não definido';
+  const [userData, setUserData] = useState<any>(null);
+  const [departamentos, setDepartamentos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      const token = localStorage.getItem('token');
+      
+      // Busca dados do usuário e lista de departamentos [cite: 22, 114]
+      Promise.all([
+        fetch('http://192.168.2.155:7000/usuarios/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json()),
+        fetch('http://192.168.2.155:7000/departamentos', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json())
+      ])
+        .then(([user, depts]) => {
+          setUserData(user);
+          setDepartamentos(depts);
+        })
+        .catch(err => console.error("Erro ao carregar dados:", err))
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen]);
+
+  // Função para mapear o ID do departamento para o Nome [cite: 114]
+  const getNomeSetor = () => {
+    if (!userData?.idDepartamento) return 'Não definido';
+    const dept = departamentos.find(d => d.id === userData.idDepartamento);
+    return dept ? dept.nome : 'Desconhecido';
+  };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
       onClose();
     }
   };
+
+  if (!isOpen) return null;
 
   const InputField = ({ label, value, readOnly = false, onChange }: any) => (
     <div>
@@ -47,7 +76,8 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-custom-fade" onClick={handleOverlayClick}>
+    // Removido o 'backdrop-blur-sm' e a animação que causavam a linha cinza
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={handleOverlayClick}>
       <div ref={modalRef} className={`w-full max-w-md rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-[#202124]' : 'bg-white'}`}>
         <div className="flex justify-between items-center mb-6">
           <h2 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Meu Perfil</h2>
@@ -56,18 +86,18 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
 
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-24 h-24 rounded-full bg-[#E95C13] flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-            {userName.substring(0, 2).toUpperCase()}
+            {userData?.nome ? userData.nome.substring(0, 2).toUpperCase() : userName.substring(0, 2).toUpperCase()}
             <button className="absolute bottom-0 right-0 p-2 bg-gray-800 rounded-full text-white hover:bg-black"><Camera size={14} /></button>
           </div>
         </div>
 
         <div className="space-y-4">
-          <InputField label="Nome Completo" value={userName} readOnly />
+          <InputField label="Nome Completo" value={userData?.nome || userName} readOnly />
           <div className="grid grid-cols-2 gap-4">
-            <InputField label="Setor" value={userSetor} readOnly />
-            <InputField label="Cargo" value={userCargo} readOnly />
+            <InputField label="Setor" value={loading ? 'Carregando...' : getNomeSetor()} readOnly />
+            <InputField label="Cargo" value={userData?.cargo || 'Não definido'} readOnly />
           </div>
-          <InputField label="E-mail" value={email} onChange={(e: any) => setEmail(e.target.value)} />
+          <InputField label="E-mail" value={userData?.email || ''} onChange={(e: any) => setUserData({...userData, email: e.target.value})} />
           <InputField label="Nova Senha" value="••••••••" onChange={() => {}} />
         </div>
 
