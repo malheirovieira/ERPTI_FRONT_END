@@ -10,6 +10,7 @@ export interface Ticket {
   categoria: string;
   prioridade: TicketPrioridade;
   cliente: string;
+  usuario: string;
   descricao: string;
   status: TicketStatus;
   responsavel?: string;
