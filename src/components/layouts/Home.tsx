@@ -143,14 +143,14 @@ export const Home: React.FC = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className={`border-r h-full flex flex-col shrink-0 transition-all duration-700 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-20'} ${theme === 'dark' ? 'bg-[#2a2b2e] border-[#35363a]' : 'bg-white border-[#dee2e6]'}`}>
+      <div className="flex flex-1 overflow-hidden overflow-x-hidden">
+      <aside className={`border-r h-full flex flex-col shrink-0 overflow-x-hidden transition-all duration-700 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-20'} ${theme === 'dark' ? 'bg-[#2a2b2e] border-[#35363a]' : 'bg-white border-[#dee2e6]'}`}>
           
           <div className="p-6 flex items-center justify-center">
             <LucideIcons.Menu className="text-gray-400 cursor-pointer hover:text-[#E95C13] transition-colors" size={20} onClick={() => setIsSidebarOpen(!isSidebarOpen)} />
           </div>
 
-          <nav className="flex-1 overflow-y-auto no-scrollbar pt-2 space-y-0">
+          <nav className="flex-1 overflow-y-auto overflow-x-hidden w-full no-scrollbar pt-2 space-y-0">
             {itensMenu.map((item: any) => {
               const IconComponent = (LucideIcons as any)[item.icon] || LucideIcons.LayoutDashboard;
               const normalizedPath = String(item.path).startsWith('/') ? item.path : `/${item.path}`;
