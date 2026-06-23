@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, FileText, Trash2, Plus, Loader2 } from 'lucide-react';
 import type { NovoChamadoInput, TicketAnexo, TicketPrioridade } from '../types/ticket';
 import { API_URL, getAuthHeaders } from '../../../../services/api';
@@ -9,17 +9,18 @@ const PRIORIDADES: TicketPrioridade[] = ['Baixa', 'Média', 'Alta', 'Crítica'];
 
 const EMPRESAS = ['EngeBag', 'Bag Cleaner', 'Iraflex'];
 
+//  Categorias ordenadas em ordem alfabética
 const CATEGORIAS = [
-  'Infraestrutura',
-  'RM',
-  'E-mail',
-  'Telefone',
-  'Computador',
-  'Impressora',
-  'Rede',
   'Acessos',
-  'Segurança',
+  'Computador',
+  'E-mail',
+  'Impressora',
+  'Infraestrutura',
   'Programas',
+  'Rede',
+  'RM',
+  'Segurança',
+  'Telefone',
 ];
 
 interface NovoChamadoModalProps {
@@ -46,6 +47,32 @@ export default function NovoChamadoModal({
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
+
+  // Estado para controlar o nome do usuário vindo da API dinâmica
+  const [nomeUsuario, setNomeUsuario] = useState(usuarioLogado || '');
+
+  // Efeito para buscar o usuário logado de forma dinâmica ao abrir o modal
+  useEffect(() => {
+    if (aberto) {
+      async function carregarPerfilUsuario() {
+        try {
+          const response = await fetch(`${API_URL}/usuarios/me`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+          });
+          if (response.ok) {
+            const dados = await response.json();
+            if (dados && dados.nome) {
+              setNomeUsuario(dados.nome);
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao obter dados do usuário logado:", error);
+        }
+      }
+      carregarPerfilUsuario();
+    }
+  }, [aberto]);
 
   if (!aberto) return null;
 
@@ -115,17 +142,17 @@ export default function NovoChamadoModal({
     try {
       const response = await fetch(`${API_URL}/chamados`, {
         method: 'POST',
-        headers: getAuthHeaders(), // Injeta dinamicamente o Token Bearer [cite: 227]
+        headers: getAuthHeaders(), // Injeta dinamicamente o Token Bearer
         body: JSON.stringify(bodyChamado),
       });
 
       if (!response.ok) {
-        // Trata respostas de erro de negócio enviadas pela API (Ex: sem permissão na empresa) [cite: 237, 238]
+        // Trata respostas de erro de negócio enviadas pela API (Ex: sem permissão na empresa)
         const textoErro = await response.text();
         throw new Error(textoErro || 'Ocorreu um erro ao registrar o chamado.');
       }
 
-      // Tratamento da resposta de sucesso do backend (Ex: "Chamado criado com sucesso! ID: 2") [cite: 235, 236]
+      // Tratamento da resposta de sucesso do backend (Ex: "Chamado criado com sucesso! ID: 2")
       const respostaSucesso = await response.text();
       
       // Captura o ID gerado usando expressão regular
@@ -233,7 +260,7 @@ export default function NovoChamadoModal({
             <Campo label="Usuário">
               <input
                 type="text"
-                value={usuarioLogado}
+                value={nomeUsuario}
                 disabled
                 readOnly
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-slate-100 text-slate-500 outline-none cursor-not-allowed"
