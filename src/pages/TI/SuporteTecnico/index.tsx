@@ -1,11 +1,12 @@
-import { useState } from 'react'; // Importado useState para gerenciar o clique dos cards
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import DashboardCards from './components/DashboardCards';
 import TicketFilters from './components/TicketFilters';
 import TicketModal from './components/TicketModal';
 import NovoChamadoModal from './components/NovoChamadoModal';
 import { useTicketStore } from './store/useTicketStore';
-import type { NovoChamadoInput, Ticket } from './types/ticket';
+import type { Ticket } from './types/ticket';
+import { listarChamados } from './services/ticketService';
 
 export default function SuporteTecnico() {
     const setSelectedTicket = useTicketStore(
@@ -29,6 +30,7 @@ export default function SuporteTecnico() {
     // Lista de chamados. Vazia por padrão — alimente via API (ex: useEffect + fetch/service)
     // assim que o back-end estiver disponível.
     const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [carregando, setCarregando] = useState(true);
 
     // Configuração de cores para níveis de prioridade
     const prioridadeConfig: Record<string, string> = {
@@ -47,6 +49,24 @@ export default function SuporteTecnico() {
         'Fechado': '#FBBD49',
     };
 
+    async function carregarChamados() {
+        try {
+            setCarregando(true);
+    
+            const chamados = await listarChamados();
+    
+            setTickets(chamados);
+        } catch (error) {
+            console.error('Erro ao carregar chamados:', error);
+        } finally {
+            setCarregando(false);
+        }
+    }
+
+    useEffect(() => {
+        carregarChamados();
+    }, []);
+
     // Base já filtrada pelo TicketFilters (ou a lista completa, se nenhum filtro de busca foi aplicado ainda)
     const baseTickets = ticketsFiltradosPorBusca ?? tickets;
 
@@ -59,25 +79,19 @@ export default function SuporteTecnico() {
         return ticket.status === filtroStatus;
     });
 
-    // Cria o chamado localmente. Quando o back-end estiver pronto, troque o corpo desta
-    // função por uma chamada à API (enviando inclusive os anexos via FormData) e só
-    // atualize o estado local após a resposta de sucesso.
-    function handleCriarChamado(dados: NovoChamadoInput) {
-        const novoTicket: Ticket = {
-            id: Math.max(0, ...tickets.map((t) => t.id)) + 1,
-            titulo: dados.titulo,
-            categoria: dados.categoria,
-            prioridade: dados.prioridade,
-            cliente: dados.cliente,
-            usuario: dados.usuario,
-            descricao: dados.descricao,
-            status: 'Aberto',
-            dataCriacao: new Date().toISOString().slice(0, 10),
-            anexos: dados.anexos,
-        };
-
-        setTickets((atual) => [novoTicket, ...atual]);
+    async function handleCriarChamado() {
+        await carregarChamados();
         setModalNovoChamadoAberto(false);
+    }
+
+    if (carregando) {
+        return (
+            <div className="flex justify-center items-center h-96">
+                <span className="text-slate-500">
+                    Carregando chamados...
+                </span>
+            </div>
+        );
     }
 
     return (
@@ -152,7 +166,11 @@ export default function SuporteTecnico() {
                             {/* Exibição dos dados do cliente e solicitante */}
                             <div className="flex justify-between text-[13px] text-slate-400">
                                 <span>Cliente: {ticket.cliente} | Usuário: {ticket.usuario}</span>
-                                <span>22/06/2026</span>
+                                <span>
+                                    {ticket.dataCriacao
+                                        ? new Date(ticket.dataCriacao).toLocaleDateString('pt-BR')
+                                        : '-'}
+                                </span>
                             </div>
 
                             {/* Conteúdo oculto revelado na expansão do card */}

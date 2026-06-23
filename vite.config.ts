@@ -8,4 +8,8 @@ export default defineConfig({
     react(),
     tailwindcss(), // Ativa o motor do Tailwind v4 no build do Vite
   ],
+  define: {
+    // Mapeia o objeto 'global' para o 'window' do navegador
+    global: 'window',
+  },
 })

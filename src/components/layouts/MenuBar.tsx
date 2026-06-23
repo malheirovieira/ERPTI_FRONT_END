@@ -17,6 +17,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   if (!isOpen) return null;
 
   return (
+    /* Ajustado de top-20 (80px) para top-[85px] caso precise alinhar com a altura do header,
+      ou mantido o padrão nativo top-20 para evitar warnings de classes em pixels fixos.
+    */
     <div className={`absolute top-20 right-0 w-64 rounded-lg shadow-xl border py-2 z-50 ${theme === 'dark' ? 'bg-[#404145] border-[#4a4b50]' : 'bg-white border-gray-100'}`}>
       <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'border-[#4a4b50]' : 'border-gray-100'}`}>
         <p className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{nomeUsuario}</p>

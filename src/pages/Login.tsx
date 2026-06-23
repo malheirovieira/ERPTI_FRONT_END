@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Headset, Eye, EyeOff } from 'lucide-react';
 import { useTheme } from "../context/ThemeContext";
+// Importação da URL configurada centralizadamente
+import { API_URL } from '../services/api'; 
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +20,8 @@ export const Login: React.FC = () => {
     setCarregando(true);
   
     try {
-      const response = await fetch('http://192.168.2.155:7000/auth/login', {
+      // Alterado para utilizar a constante global API_URL
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -32,14 +35,11 @@ export const Login: React.FC = () => {
 
       const data = await response.json();
       
-      // Armazena o token JWT para autenticação Bearer
+      // Armazena o token JWT para autenticação Bearer nas próximas requisições
       localStorage.setItem('token', data.token);
       localStorage.setItem('userEmail', email.trim());
 
-      // Opcional: Aqui você pode buscar dados adicionais do usuário em /usuarios/me [cite: 62]
-      // para preencher localStorage como setar empresaAcesso, cargo, etc.
-
-      setTheme('light'); // Ou recupere o tema do banco após logar
+      setTheme('light'); 
       setCarregando(false);
       navigate('/home', { replace: true });
       

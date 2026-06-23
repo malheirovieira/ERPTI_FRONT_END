@@ -7,6 +7,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { MenuBar } from '../layouts/MenuBar';
 import { ProfileMenuModal } from '../layouts/ProfileMenuModal';
 
+// Importa a URL centralizada e a função de cabeçalhos autenticados
+import { API_URL, getAuthHeaders } from '../../services/api';
+
 export const Home: React.FC = () => {
   const { empresa, corTema } = useEmpresa();
   const { theme, toggleTheme, setTheme } = useTheme();
@@ -26,13 +29,18 @@ export const Home: React.FC = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      fetch('http://192.168.2.155:7000/usuarios/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      // Ajustado para usar a constante global e o gerenciador de headers
+      fetch(`${API_URL}/usuarios/me`, {
+        headers: getAuthHeaders()
       })
       .then(res => res.json())
       .then(data => {
         setNomeUsuario(data.nome);
         setUserSetor(data.departamento?.nome || 'TI');
+        
+        // Mantém atualizado no localStorage para evitar delay visual no refresh
+        localStorage.setItem('userName', data.nome);
+        localStorage.setItem('userSetor', data.departamento?.nome || 'TI');
       })
       .catch(err => console.error("Erro ao buscar dados do usuário:", err));
     }
@@ -79,17 +87,7 @@ export const Home: React.FC = () => {
   const menuPerfilItens = useMemo(() => [
     { label: 'Meu Perfil', icon: 'User', action: () => setIsProfileModalOpen(true) },
     { label: 'Ajuda', icon: 'LifeBuoy', action: () => console.log('Ajuda') },
-
-    // BOTÃO DE TEMA DESATIVADO (DESCONTINUADO MOMENTANEAMENTE)
-    /*
-    { 
-      label: theme === 'light' ? 'Modo Escuro' : 'Modo Claro', 
-      icon: theme === 'light' ? 'Moon' : 'Sun', 
-      action: toggleTheme
-    },
-    */
-    
-  ], [theme, toggleTheme]);
+  ], []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -144,7 +142,7 @@ export const Home: React.FC = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden overflow-x-hidden">
-      <aside className={`border-r h-full flex flex-col shrink-0 overflow-x-hidden transition-all duration-700 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-20'} ${theme === 'dark' ? 'bg-[#2a2b2e] border-[#35363a]' : 'bg-white border-[#dee2e6]'}`}>
+        <aside className={`border-r h-full flex flex-col shrink-0 overflow-x-hidden transition-all duration-700 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-20'} ${theme === 'dark' ? 'bg-[#2a2b2e] border-[#35363a]' : 'bg-white border-[#dee2e6]'}`}>
           
           <div className="p-6 flex items-center justify-center">
             <LucideIcons.Menu className="text-gray-400 cursor-pointer hover:text-[#E95C13] transition-colors" size={20} onClick={() => setIsSidebarOpen(!isSidebarOpen)} />

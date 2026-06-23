@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, Eye, EyeOff, ChevronDown, CheckCircle } from 'lucide-react';
+// Importação da URL configurada centralizadamente
+import { API_URL } from '../services/api'; 
 
 export const Cadastro: React.FC = () => {
   const navigate = useNavigate();
@@ -16,9 +18,9 @@ export const Cadastro: React.FC = () => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Busca setores no IP 192.168.2.155:7000
+  // Busca setores utilizando a URL centralizada
   useEffect(() => {
-    fetch('http://192.168.2.155:7000/departamentos')
+    fetch(`${API_URL}/departamentos`)
       .then(res => res.json())
       .then(data => setSetores(data))
       .catch(err => console.error("Erro ao buscar setores:", err));
@@ -33,9 +35,9 @@ export const Cadastro: React.FC = () => {
   const handleCadastro = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Envio para o back-end
+    // Envio para o back-end utilizando a URL centralizada
     try {
-      const response = await fetch('http://192.168.2.155:7000/auth/cadastrar', {
+      const response = await fetch(`${API_URL}/auth/cadastrar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

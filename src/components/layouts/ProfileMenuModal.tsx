@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Pencil, Lock } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+// Importação da URL centralizada e dos headers de autenticação
+import { API_URL, getAuthHeaders } from '../../services/api'; 
 
 interface ProfileMenuModalProps {
   isOpen: boolean;
@@ -18,15 +20,15 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
 
   useEffect(() => {
     if (isOpen) {
-      const token = localStorage.getItem('token');
-      
-      // Busca dados do usuário e lista de departamentos [cite: 22, 114]
+      setLoading(true); // Garante o estado de loading ao reabrir o modal
+
+      // Busca dados do usuário e lista de departamentos utilizando a configuração centralizada
       Promise.all([
-        fetch('http://192.168.2.155:7000/usuarios/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_URL}/usuarios/me`, {
+          headers: getAuthHeaders() // Injeta dinamicamente Content-Type e Authorization Bearer
         }).then(res => res.json()),
-        fetch('http://192.168.2.155:7000/departamentos', {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_URL}/departamentos`, {
+          headers: getAuthHeaders()
         }).then(res => res.json())
       ])
         .then(([user, depts]) => {
@@ -38,7 +40,7 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
     }
   }, [isOpen]);
 
-  // Função para mapear o ID do departamento para o Nome [cite: 114]
+  // Função para mapear o ID do departamento para o Nome
   const getNomeSetor = () => {
     if (!userData?.idDepartamento) return 'Não definido';
     const dept = departamentos.find(d => d.id === userData.idDepartamento);
@@ -76,7 +78,6 @@ export const ProfileMenuModal: React.FC<ProfileMenuModalProps> = ({ isOpen, onCl
   );
 
   return (
-    // Removido o 'backdrop-blur-sm' e a animação que causavam a linha cinza
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={handleOverlayClick}>
       <div ref={modalRef} className={`w-full max-w-md rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-[#202124]' : 'bg-white'}`}>
         <div className="flex justify-between items-center mb-6">
