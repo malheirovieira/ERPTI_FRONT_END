@@ -10,19 +10,31 @@ import { API_URL, getAuthHeaders } from '../../../../services/api';
 const LARANJA = 'rgb(233, 92, 19)';
 const TAMANHO_MAXIMO_MB = 10;
 
+// 🟢 AJUSTE: Mapeamento completo de prioridades idêntico à listagem anterior
 const prioridadeConfig: Record<string, string> = {
-  Crítica: 'bg-red-600',
-  Alta: 'bg-orange-600',
-  Média: 'bg-yellow-500',
-  Baixa: 'bg-green-600',
+  'Crítica': 'bg-red-600',
+  'CRÍTICA': 'bg-red-600',
+  'CRITICA': 'bg-red-600',
+  'Alta': 'bg-orange-600',
+  'ALTA': 'bg-orange-600',
+  'Média': 'bg-yellow-500',
+  'MÉDIA': 'bg-yellow-500',
+  'MEDIA': 'bg-yellow-500',
+  'Baixa': 'bg-green-600',
+  'BAIXA': 'bg-green-600',
 };
 
+// 🟢 AJUSTE: Mapeamento completo de status idêntico à listagem anterior
 const statusConfig: Record<string, string> = {
-  Aberto: '#FAA72A',
+  'Aberto': '#FAA72A',
+  'ABERTO': '#FAA72A',
   'Em andamento': '#FBBD49',
+  'EM_ANDAMENTO': '#FBBD49',
   'Aguardando cliente': '#DFF368',
-  Resolvido: '#FAA72A',
-  Fechado: '#FBBD49',
+  'Resolvido': '#FAA72A',
+  'RESOLVIDO': '#FAA72A',
+  'Fechado': '#FBBD49',
+  'FECHADO': '#FBBD49',
 };
 
 export default function TicketModal() {
@@ -34,6 +46,9 @@ export default function TicketModal() {
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
   const [enviandoMensagem, setEnviandoMensagem] = useState(false);
 
+  // Estado para armazenar o usuário atualmente logado (obtido da rota /usuarios/me)
+  const [usuarioLogado, setUsuarioLogado] = useState<{ id: number; nome: string; email: string } | null>(null);
+
   // Estados do Chat Input acoplados
   const [texto, setTexto] = useState('');
   const [anexos, setAnexos] = useState<TicketAnexo[]>([]);
@@ -42,11 +57,30 @@ export default function TicketModal() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
   
-  // Ref para guardar a conexão do STOMP ativa e não perder a referência nos renders
+  // Ref para guardar a conexão do STOMP activa e não perder a referência nos renders
   const stompClientRef = useRef<Stomp.Client | null>(null);
 
   const disabled = enviandoMensagem || carregandoMensagens;
   const podeEnviar = (texto.trim() !== '' || anexos.length > 0) && !disabled;
+
+  // 0. CARREGA O PERFIL DO USUÁRIO LOGADO AO MONTAR O COMPONENTE
+  useEffect(() => {
+    async function carregarPerfilUsuario() {
+      try {
+        const response = await fetch(`${API_URL}/usuarios/me`, {
+          method: 'GET',
+          headers: getAuthHeaders()
+        });
+        if (response.ok) {
+          const dados = await response.json();
+          setUsuarioLogado(dados);
+        }
+      } catch (error) {
+        console.error("Erro ao obter dados do usuário logado do endpoint /usuarios/me:", error);
+      }
+    }
+    carregarPerfilUsuario();
+  }, []);
 
   // 1. CARREGAR HISTÓRICO E CONECTAR WEBSOCKET
   useEffect(() => {
@@ -66,10 +100,10 @@ export default function TicketModal() {
         
         if (response.ok) {
           const dados = await response.json();
-          const mensagensFormatadas: TicketChatMensagem[] = dados.map((msg: any) => ({
+          const mensagensFormatadas: any[] = dados.map((msg: any) => ({
             id: msg.id?.toString() || crypto.randomUUID(),
             autor: msg.usuarioEnvio?.nome || msg.remetenteNome || 'Sistema',
-            autorTipo: (msg.usuarioEnvio?.role === 'ADMIN' || msg.usuarioEnvio?.role === 'TECNICO') ? 'tecnico' : 'cliente',
+            autorEmail: msg.usuarioEnvio?.email || msg.remetenteEmail || null,
             texto: msg.mensagem,
             enviadoEm: msg.dataEnvio,
             anexos: msg.anexos || [],
@@ -103,10 +137,10 @@ export default function TicketModal() {
           setMensagens((atual) => {
             if (atual.some(m => m.id === msgRecebida.id?.toString())) return atual;
 
-            const novaMensagem: TicketChatMensagem = {
+            const novaMensagem: any = {
               id: msgRecebida.id?.toString() || crypto.randomUUID(),
               autor: msgRecebida.remetenteNome || msgRecebida.usuarioEnvio?.nome || 'Sistema',
-              autorTipo: (msgRecebida.role === 'USER') ? 'cliente' : 'tecnico', 
+              autorEmail: msgRecebida.usuarioEnvio?.email || msgRecebida.remetenteEmail || null,
               enviadoEm: msgRecebida.dataEnvio || new Date().toISOString(),
               texto: msgRecebida.mensagem,
               anexos: msgRecebida.anexos || []
@@ -132,8 +166,9 @@ export default function TicketModal() {
 
   if (!selectedTicket) return null;
 
-  const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || 'bg-slate-500';
-  const statusColor = statusConfig[selectedTicket.status] || '#DFF368';
+  // 🟢 AJUSTE: Tratamento robusto para buscar as cores por chave direta ou em caixa alta
+  const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || prioridadeConfig[selectedTicket.prioridade?.toUpperCase()] || 'bg-slate-500';
+  const statusColor = statusConfig[selectedTicket.status] || statusConfig[selectedTicket.status?.toUpperCase()] || '#DFF368';
 
   function fechar() {
     setSelectedTicket(null);
@@ -292,11 +327,16 @@ export default function TicketModal() {
             </span>
           </div>
 
-          <div className="flex justify-between text-[13px] text-slate-400 mt-3">
+          {/* 🟢 AJUSTE: Formatação de Empresa e Usuário idênticos à estética da listagem (sem uppercase e com realce na cor do texto) */}
+          <div className="flex justify-between text-[12px] text-slate-400 font-medium mt-4">
             <span>
-              Cliente: {selectedTicket.cliente} | Usuário: {selectedTicket.usuario}
+              Empresa: <span className="text-slate-700 font-semibold">{selectedTicket.cliente || selectedTicket.empresa}</span>
+              {'  |  '}
+              Usuário: <span className="text-slate-700 font-semibold">{selectedTicket.usuario || selectedTicket.usuarioAbriu?.nome}</span>
             </span>
-            <span>Responsável: {selectedTicket.responsavel || 'Não atribuído'}</span>
+            <span className="font-semibold text-slate-500">
+              Responsável: <span className="text-slate-700">{selectedTicket.responsavel || 'Não atribuído'}</span>
+            </span>
           </div>
 
           <p className="text-sm text-slate-600 mt-3">{selectedTicket.descricao}</p>
@@ -311,41 +351,7 @@ export default function TicketModal() {
               Nenhuma mensagem ainda. Escreva abaixo para iniciar a conversa.
             </div>
           ) : (
-            mensagens.map((msg) => {
-              const ehCliente = msg.autorTipo === 'cliente';
-              return (
-                <div key={msg.id} className={`flex ${ehCliente ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] ${ehCliente ? 'items-end' : 'items-start'} flex flex-col`}>
-                    <div
-                      className={`rounded-xl px-4 py-2.5 text-sm ${
-                        ehCliente ? 'text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-sm'
-                      }`}
-                      style={ehCliente ? { backgroundColor: LARANJA } : undefined}
-                    >
-                      {msg.texto && <p className="whitespace-pre-wrap">{msg.texto}</p>}
-
-                      {msg.anexos && msg.anexos.length > 0 && (
-                        <ul className={`space-y-1 ${msg.texto ? 'mt-2' : ''}`}>
-                          {msg.anexos.map((anexo) => (
-                            <li
-                              key={anexo.nome}
-                              className={`text-xs underline ${ehCliente ? 'text-white/90' : 'text-slate-500'}`}
-                            >
-                              <a href={anexo.url} target="_blank" rel="noreferrer">
-                                {anexo.nome}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-slate-400 mt-1 px-1">
-                      {msg.autor} · {formatarHora(msg.enviadoEm)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
+            messagesMap(mensagens, usuarioLogado)
           )}
         </div>
 
@@ -421,4 +427,46 @@ export default function TicketModal() {
       </div>
     </div>
   );
+
+  // Função interna para organizar a renderização mapeada das mensagens
+  function messagesMap(listaDeMensagens: TicketChatMensagem[], usuario: any) {
+    return listaDeMensagens.map((msg: any) => {
+      const ehMinhaMensagem = usuario 
+        ? (msg.autorEmail === usuario.email || msg.autor === usuario.nome)
+        : false;
+
+      return (
+        <div key={msg.id} className={`flex ${ehMinhaMensagem ? 'justify-end' : 'justify-start'}`}>
+          <div className={`max-w-[75%] ${ehMinhaMensagem ? 'items-end' : 'items-start'} flex flex-col`}>
+            <div
+              className={`rounded-xl px-4 py-2.5 text-sm ${
+                ehMinhaMensagem ? 'text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-sm'
+              }`}
+              style={ehMinhaMensagem ? { backgroundColor: LARANJA } : undefined}
+            >
+              {msg.texto && <p className="whitespace-pre-wrap">{msg.texto}</p>}
+
+              {msg.anexos && msg.anexos.length > 0 && (
+                <ul className={`space-y-1 ${msg.texto ? 'mt-2' : ''}`}>
+                  {msg.anexos.map((anexo: any) => (
+                    <li
+                      key={anexo.nome}
+                      className={`text-xs underline ${ehMinhaMensagem ? 'text-white/90' : 'text-slate-500'}`}
+                    >
+                      <a href={anexo.url} target="_blank" rel="noreferrer">
+                        {anexo.nome}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 px-1">
+              {msg.autor} · {formatarHora(msg.enviadoEm)}
+            </span>
+          </div>
+        </div>
+      );
+    });
+  }
 }

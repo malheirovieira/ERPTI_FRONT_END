@@ -18,14 +18,24 @@ export interface Ticket {
   titulo: string;
   categoria: string;
   prioridade: TicketPrioridade;
-  cliente: string;
-  usuario: string;
+  cliente: string; // Mantido por compatibilidade
+  usuario: string; // Mantido por compatibilidade
   descricao: string;
   status: TicketStatus;
   responsavel?: string;
   /** Data de criação do chamado, formato ISO (ex: '2026-06-22'). Opcional até o back-end enviar esse campo. */
   dataCriacao?: string;
   anexos?: TicketAnexo[];
+
+  // ─── NOVOS CAMPOS VINDOS DA API DO BACK-END ──────────────────────────────
+  empresa?: string;
+  usuarioAbriu?: {
+    id: number;
+    nome: string;
+    email: string;
+    role?: string;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 }
 
 /** Dados preenchidos pelo cliente ao abrir um novo chamado. */

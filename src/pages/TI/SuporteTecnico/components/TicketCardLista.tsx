@@ -6,7 +6,7 @@ interface Props {
   onClick?: () => void;
 }
 
-// Mapeamento das cores para aceitar tanto o formato antigo quanto o novo do banco
+// Configuração estética das badges de prioridade
 const prioridadeColors: Record<string, string> = {
   Baixa: 'bg-green-50 text-green-600',
   Média: 'bg-yellow-50 text-yellow-600',
@@ -19,11 +19,10 @@ const prioridadeColors: Record<string, string> = {
 };
 
 export default function TicketCard({ ticket, onClick }: Props) {
-  // Captura o valor da criticidade ou prioridade vindo da API
-  const prioridadeExibida = ticket.prioridade || (ticket as any).criticidade || 'N/A';
-  
-  // Captura o cliente ou empresa
-  const clienteExibido = ticket.cliente || (ticket as any).empresa || 'Não informado';
+  // Captura os valores já mapeados com segurança pela Store
+  const prioridadeExibida = ticket.prioridade || 'N/A';
+  const clienteExibido = ticket.cliente || 'Não informado';
+  const usuarioExibido = ticket.usuario || 'Não informado';
 
   return (
     <div
@@ -43,27 +42,24 @@ export default function TicketCard({ ticket, onClick }: Props) {
         {ticket.descricao}
       </p>
 
-          <div className="flex items-center justify-between text-xs text-gray-400">
-      <div className="flex items-center gap-2">
-        <User size={14} />
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <div className="flex items-center gap-2">
+          <User size={14} />
+          <span>
+            Empresa: <strong>{clienteExibido}</strong>
+            {' | '}
+            Usuário: <strong>{usuarioExibido}</strong>
+          </span>
+        </div>
 
-        <span>
-          Empresa: <strong>{clienteExibido}</strong>
-          {' | '}
-          Usuário: <strong>{ticket.usuario || 'Não informado'}</strong>
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1">
-        <Clock size={14} />
-        {
-          ticket.status
-            ? ticket.status.charAt(0).toUpperCase() +
-              ticket.status.slice(1).toLowerCase()
+        <div className="flex items-center gap-1">
+          <Clock size={14} />
+          {ticket.status
+            ? ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).toLowerCase()
             : 'Pendente'
-        }
+          }
+        </div>
       </div>
-    </div>
     </div>
   );
 }

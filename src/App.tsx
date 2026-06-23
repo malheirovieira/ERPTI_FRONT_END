@@ -8,7 +8,7 @@ import { Home } from './components/layouts/Home';
 
 import { AutomacaoSQL } from './pages/TI/Automacao/AutomacaoSQL';
 import { BackupsServidores } from './pages/TI/Backup/BackupsServidores';
-import SuporteTecnico from './pages/TI/SuporteTecnico'; 
+import SuporteTecnico from './pages/TI/SuporteTecnico/SuporteTecnico'; 
 import { VisaoGeral } from './pages/VisaoGeral/VisaoGeral';
 
 export default function App() {

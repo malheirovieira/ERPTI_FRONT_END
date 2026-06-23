@@ -1,86 +1,72 @@
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import DashboardCards from './components/DashboardCards';
-import TicketFilters from './components/TicketFilters';
-import TicketModal from './components/TicketModal';
-import NovoChamadoModal from './components/NovoChamadoModal';
+import DashboardCards from './components/TicketDashboard';
+import TicketFilters from './components/TicketFiltro';
+import TicketModal from './components/TicketChat';
+import NovoChamadoModal from './components/TicketCriacao';
 import { useTicketStore } from './store/useTicketStore';
 import type { Ticket } from './types/ticket';
-import { listarChamados } from './services/ticketService';
 
 export default function SuporteTecnico() {
-    const setSelectedTicket = useTicketStore(
-        (state) => state.setSelectedTicket
-    );
+    // Capturando os estados globais da Store do Zustand
+    const { 
+        tickets, 
+        loading: carregando, 
+        fetchTickets, 
+        setSelectedTicket 
+    } = useTicketStore();
 
-    // Estado responsável por armazenar o filtro ativo vindo dos DashboardCards
     const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
-
-    // Lista de tickets já filtrada pelo TicketFilters (busca, categoria, prioridade, cliente, data)
     const [ticketsFiltradosPorBusca, setTicketsFiltradosPorBusca] = useState<Ticket[] | null>(null);
-
-    // Controle do modal de abertura de novo chamado
     const [modalNovoChamadoAberto, setModalNovoChamadoAberto] = useState(false);
-
-    // Nome do usuário autenticado. Por enquanto fixo aqui — quando o back-end
-    // (Bearer Token) estiver integrado, troque por dados reais vindos do hook
-    // de autenticação (ex: const { user } = useAuth(); usuarioLogado={user.nome}).
     const usuarioLogado = 'João Silva';
 
-    // Lista de chamados. Vazia por padrão — alimente via API (ex: useEffect + fetch/service)
-    // assim que o back-end estiver disponível.
-    const [tickets, setTickets] = useState<Ticket[]>([]);
-    const [carregando, setCarregando] = useState(true);
-
-    // Configuração de cores para níveis de prioridade
+    // Configuração de cores originais mapeando todas as variações possíveis da API
     const prioridadeConfig: Record<string, string> = {
         'Crítica': 'bg-red-600',
+        'CRÍTICA': 'bg-red-600',
+        'CRITICA': 'bg-red-600',
         'Alta': 'bg-orange-600',
+        'ALTA': 'bg-orange-600',
         'Média': 'bg-yellow-500',
+        'MÉDIA': 'bg-yellow-500',
+        'MEDIA': 'bg-yellow-500',
         'Baixa': 'bg-green-600',
+        'BAIXA': 'bg-green-600',
     };
 
-    // Paleta de cores customizada para os estados de fluxo do chamado
     const statusConfig: Record<string, string> = {
         'Aberto': '#FAA72A',
+        'ABERTO': '#FAA72A',
         'Em andamento': '#FBBD49',
+        'EM_ANDAMENTO': '#FBBD49',
         'Aguardando cliente': '#DFF368',
         'Resolvido': '#FAA72A',
+        'RESOLVIDO': '#FAA72A',
         'Fechado': '#FBBD49',
+        'FECHADO': '#FBBD49',
     };
 
-    async function carregarChamados() {
-        try {
-            setCarregando(true);
-    
-            const chamados = await listarChamados();
-    
-            setTickets(chamados);
-        } catch (error) {
-            console.error('Erro ao carregar chamados:', error);
-        } finally {
-            setCarregando(false);
-        }
-    }
-
     useEffect(() => {
-        carregarChamados();
-    }, []);
+        fetchTickets();
+    }, [fetchTickets]);
 
-    // Base já filtrada pelo TicketFilters (ou a lista completa, se nenhum filtro de busca foi aplicado ainda)
     const baseTickets = ticketsFiltradosPorBusca ?? tickets;
 
-    // Filtra a lista de exibição com base no card ativo no Dashboard, em cima do resultado do TicketFilters
     const ticketsFiltrados = baseTickets.filter(ticket => {
-        if (!filtroStatus) return true; // Se nenhum card estiver selecionado, exibe todos
-        if (filtroStatus === 'Resolvido') {
-            return ticket.status === 'Resolvido' || ticket.status === 'Fechado';
+        if (!filtroStatus) return true;
+        
+        const statusNormalizado = ticket.status?.toUpperCase();
+        const filtroNormalizado = filtroStatus.toUpperCase();
+
+        if (filtroNormalizado === 'RESOLVIDO') {
+            return statusNormalizado === 'RESOLVIDO' || statusNormalizado === 'FECHADO';
         }
-        return ticket.status === filtroStatus;
+        return statusNormalizado === filtroNormalizado;
     });
 
     async function handleCriarChamado() {
-        await carregarChamados();
+        await fetchTickets();
         setModalNovoChamadoAberto(false);
     }
 
@@ -88,7 +74,7 @@ export default function SuporteTecnico() {
         return (
             <div className="flex justify-center items-center h-96">
                 <span className="text-slate-500">
-                    Carregando chamados...
+                    Carregando chamados do servidor...
                 </span>
             </div>
         );
@@ -96,7 +82,7 @@ export default function SuporteTecnico() {
 
     return (
         <div className="p-6 space-y-6">
-            {/* Cabeçalho com ação principal de abertura de chamado */}
+            {/* Cabeçalho */}
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-bold text-slate-800">Suporte Técnico</h1>
                 <button
@@ -109,7 +95,6 @@ export default function SuporteTecnico() {
                 </button>
             </div>
 
-            {/* Passando os estados e a lista de tickets para sincronismo dinâmico com os cards */}
             <DashboardCards 
                 tickets={tickets} 
                 selectedStatus={filtroStatus} 
@@ -121,11 +106,9 @@ export default function SuporteTecnico() {
                 onFilterChange={(_, filtrados) => setTicketsFiltradosPorBusca(filtrados)}
             />
 
-            {/* O container mantém a KEY para resetar a lista inteira do zero a cada clique,
-                mas a animação agora acontece individualmente em cada item abaixo. */}
+            {/* Container da listagem */}
             <div key={filtroStatus || 'todos'} className="space-y-6">
                 
-                {/* Injeção global dos Keyframes para a aparição individual de cada chamado */}
                 <style dangerouslySetInnerHTML={{__html: `
                     @keyframes fadeInItem {
                         from { opacity: 0; transform: translateY(20px); }
@@ -133,21 +116,22 @@ export default function SuporteTecnico() {
                     }
                 `}} />
 
-                {/* Renderização da lista utilizando a constante filtrada com capturador de index */}
                 {ticketsFiltrados.map((ticket, index) => {
-                    const bgPrioridade = prioridadeConfig[ticket.prioridade] || 'bg-slate-500';
-                    const statusColor = statusConfig[ticket.status] || '#DFF368';
+                    // Busca a cor correta aceitando tanto 'Baixa' quanto 'BAIXA'
+                    const bgPrioridade = prioridadeConfig[ticket.prioridade] || prioridadeConfig[ticket.prioridade?.toUpperCase()] || 'bg-slate-500';
+                    const statusColor = statusConfig[ticket.status] || statusConfig[ticket.status?.toUpperCase()] || '#DFF368';
                     
                     return (
                         <div
                             key={ticket.id}
                             onClick={() => setSelectedTicket(ticket)}
                             className="group bg-white border border-slate-200 rounded-xl p-5 cursor-pointer transition-all duration-800 ease-in-out overflow-hidden max-h-[120px] hover:max-h-[300px] hover:shadow-lg opacity-0 animate-[fadeInItem_1s_cubic-bezier(0.25,1,0.5,1)_forwards]"
-                            style={{ animationDelay: `${index * 200}ms` }}
+                            style={{ animationDelay: `${index * 100}ms` }}
                             onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgb(233, 92, 19)'}
                             onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(226, 232, 240)'}
                         >
                             <div className="flex justify-between items-start gap-4">
+                                {/* 🟢 CORREÇÃO: Removido o ID, exibindo apenas o título original novamente */}
                                 <h3 className="font-bold text-slate-800 text-[17px]">{ticket.titulo}</h3>
                                 <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase text-white ${bgPrioridade}`}>
                                     {ticket.prioridade}
@@ -163,10 +147,14 @@ export default function SuporteTecnico() {
                                 </span>
                             </div>
 
-                            {/* Exibição dos dados do cliente e solicitante */}
-                            <div className="flex justify-between text-[13px] text-slate-400">
-                                <span>Cliente: {ticket.cliente} | Usuário: {ticket.usuario}</span>
+                            {/* Alinhamento estético de Empresa e Usuário com nomes já formatados em formato bonito vindo da Store */}
+                            <div className="flex justify-between text-[12px] text-slate-400 font-medium">
                                 <span>
+                                    Empresa: <span className="text-slate-700 font-semibold">{ticket.cliente}</span>
+                                    {'  |  '}
+                                    Usuário: <span className="text-slate-700 font-semibold">{ticket.usuario}</span>
+                                </span>
+                                <span className="font-semibold text-slate-400">
                                     {ticket.dataCriacao
                                         ? new Date(ticket.dataCriacao).toLocaleDateString('pt-BR')
                                         : '-'}
@@ -197,6 +185,7 @@ export default function SuporteTecnico() {
                 )}
             </div>
 
+            {/* Modais da tela */}
             <TicketModal />
 
             <NovoChamadoModal
