@@ -66,7 +66,6 @@ export default function SuporteTecnico() {
             <DashboardCards tickets={tickets} selectedStatus={filtroStatus} onSelectStatus={setFiltroStatus} />
             <TicketFilters tickets={tickets} onFilterChange={(_, filtrados) => setTicketsFiltradosPorBusca(filtrados)} />
 
-            {/* Container Animado: Ajuste o staggerChildren para desacelerar a cascata */}
             <motion.div 
                 key={filtroStatus || 'todos'} 
                 className="space-y-6"
@@ -74,7 +73,7 @@ export default function SuporteTecnico() {
                 animate="visible"
                 variants={{
                     visible: { 
-                        transition: { staggerChildren: 0.3 } // AUMENTADO: intervalo maior entre cada card
+                        transition: { staggerChildren: 0.3 } 
                     }
                 }}
             >
@@ -89,9 +88,10 @@ export default function SuporteTecnico() {
                                 hidden: { opacity: 0 },
                                 visible: { opacity: 1 }
                             }}
-                            transition={{ duration: 0.8 }} // AUMENTADO: card leva mais tempo para aparecer
+                            transition={{ duration: 0.8 }}
                             onClick={() => setSelectedTicket(ticket)}
-                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-8 cursor-pointer transition-all duration-300 ease-in-out overflow-hidden max-h-[130px] hover:max-h-[300px] hover:shadow-lg hover:border-orange-500"
+                            /* Ajustado para duration-[800ms] para ser exatamente 0.8s */
+                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-8 cursor-pointer overflow-hidden transition-all duration-[800ms] ease-in-out max-h-[130px] hover:max-h-[300px] hover:shadow-lg hover:border-orange-500"
                         >
                             <div className="flex justify-between items-start gap-4">
                                 <h3 className="font-bold text-slate-800 text-[17px]">{ticket.titulo}</h3>
@@ -118,7 +118,7 @@ export default function SuporteTecnico() {
                                 <span>{ticket.dataCriacao ? new Date(ticket.dataCriacao).toLocaleDateString('pt-BR') : '-'}</span>
                             </div>
 
-                            <div className="mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                            <div className="mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity duration-[800ms] ease-in-out">
                                 <p className="text-[13px] text-slate-600 mb-4">{ticket.descricao}</p>
                                 <p className="font-semibold text-slate-700 text-[12px]">Responsável: {ticket.responsavel || 'Não atribuído'}</p>
                             </div>
