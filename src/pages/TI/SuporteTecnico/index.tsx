@@ -4,7 +4,7 @@ import DashboardCards from './components/DashboardCards';
 import TicketFilters from './components/TicketFilters';
 import TicketModal from './components/TicketModal';
 import NovoChamadoModal from './components/NovoChamadoModal';
-import { useTicketStore } from '../../../store/useTicketStore';
+import { useTicketStore } from './store/useTicketStore';
 import type { NovoChamadoInput, Ticket } from './types/ticket';
 
 export default function SuporteTecnico() {
@@ -178,6 +178,8 @@ export default function SuporteTecnico() {
                     </div>
                 )}
             </div>
+
+            <TicketModal />
 
             <NovoChamadoModal
                 aberto={modalNovoChamadoAberto}
