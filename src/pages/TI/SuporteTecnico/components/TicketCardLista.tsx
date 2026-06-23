@@ -1,3 +1,4 @@
+import { formatarStatus } from '../utils/ticketUtils';
 import type { Ticket } from '../types/ticket';
 import { Clock, User } from 'lucide-react';
 
@@ -27,7 +28,9 @@ export default function TicketCard({ ticket, onClick }: Props) {
   return (
     <div
       onClick={onClick}
-      className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow bg-white"
+      // h-full e flex flex-col permitem que o rodapé fique alinhado na base
+      // pb-6 garante o espaço inferior (respiro)
+      className="p-4 pb-6 h-full flex flex-col border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-all bg-white"
     >
       <div className="flex justify-between items-start mb-2">
         <h3 className="font-semibold text-gray-800">
@@ -42,7 +45,8 @@ export default function TicketCard({ ticket, onClick }: Props) {
         {ticket.descricao}
       </p>
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      {/* mt-auto empurra este bloco para o final do card, criando o espaço necessário */}
+      <div className="flex items-center justify-between text-xs text-gray-400 mt-auto">
         <div className="flex items-center gap-2">
           <User size={14} />
           <span>
@@ -52,12 +56,10 @@ export default function TicketCard({ ticket, onClick }: Props) {
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 font-medium text-gray-600">
           <Clock size={14} />
-          {ticket.status
-            ? ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).toLowerCase()
-            : 'Pendente'
-          }
+          {/* A função formatarStatus irá corrigir o texto EM_ANDAMENTO */}
+          {formatarStatus(ticket.status || 'Pendente')}
         </div>
       </div>
     </div>

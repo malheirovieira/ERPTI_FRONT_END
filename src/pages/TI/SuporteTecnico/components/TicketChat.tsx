@@ -1,3 +1,4 @@
+import { formatarStatus } from '../utils/ticketUtils';
 import { useState, useEffect, useRef } from 'react';
 import { X, Paperclip, Send, FileText } from 'lucide-react';
 import { useTicketStore } from '../store/useTicketStore';
@@ -41,7 +42,8 @@ export default function TicketModal() {
   const [mensagens, setMensagens] = useState<TicketChatMensagem[]>([]);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
   const [enviandoMensagem, setEnviandoMensagem] = useState(false);
-  const [usuarioLogado, setUsuarioLogado] = useState<{ id: number; nome: string; email: string } | null>(null);
+  
+  const [usuarioLogado, setUsuarioLogado] = useState<{ id: number; nome: string; email: string; role?: string } | null>(null);
 
   const [texto, setTexto] = useState('');
   const [anexos, setAnexos] = useState<TicketAnexo[]>([]);
@@ -54,7 +56,6 @@ export default function TicketModal() {
   const disabled = enviandoMensagem || carregandoMensagens;
   const podeEnviar = (texto.trim() !== '' || anexos.length > 0) && !disabled;
 
-  // Carrega os dados do perfil logado
   useEffect(() => {
     async function carregarPerfilUsuario() {
       try {
@@ -73,7 +74,6 @@ export default function TicketModal() {
     carregarPerfilUsuario();
   }, []);
 
-  // Carrega o histórico de mensagens e conecta o WebSocket
   useEffect(() => {
     if (!selectedTicket) {
       setMensagens([]);
@@ -116,8 +116,6 @@ export default function TicketModal() {
       stompClientRef.current = stomp;
 
       stomp.connect({ 'Authorization': `Bearer ${token}` }, () => {
-        console.log(`Conectado à sala do Chamado ${selectedTicket.id}`);
-
         stomp.subscribe(`/topic/chamado/${selectedTicket.id}`, (resposta) => {
           const msgRecebida = JSON.parse(resposta.body);
 
@@ -155,12 +153,63 @@ export default function TicketModal() {
   const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || prioridadeConfig[selectedTicket.prioridade?.toUpperCase()] || 'bg-slate-500';
   const statusColor = statusConfig[selectedTicket.status] || statusConfig[selectedTicket.status?.toUpperCase()] || '#DFF368';
 
+  const ehTecnicoOuAdmin = usuarioLogado?.role === 'TECNICO' || usuarioLogado?.role === 'ADMIN';
+
   function fechar() {
     setSelectedTicket(null);
     setMensagens([]);
     setTexto('');
     setAnexos([]);
     setErroInput('');
+  }
+
+  async function handleAssumirChamado() {
+    try {
+      const response = await fetch(`${API_URL}/chamados/${selectedTicket?.id}/assumir`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+      });
+  
+      if (response.ok) {
+        if (selectedTicket) {
+          setSelectedTicket({ 
+            ...selectedTicket, 
+            status: 'EM_ANDAMENTO' as any, 
+            responsavel: usuarioLogado?.nome || 'Responsável' 
+          });
+        }
+      } else {
+        const erro = await response.text();
+        setErroInput(`Erro: ${erro || 'Não foi possível assumir o chamado.'}`);
+      }
+    } catch (error) {
+      console.error("Erro na rede:", error);
+      setErroInput("Erro de conexão ao assumir chamado.");
+    }
+  }
+
+  async function handleFinalizarChamado() {
+    try {
+      const response = await fetch(`${API_URL}/chamados/${selectedTicket?.id}/status`, {
+        method: 'PATCH',
+        headers: { 
+          ...getAuthHeaders(), 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ status: 'FECHADO' }) 
+      });
+
+      if (response.ok) {
+        if (selectedTicket) {
+          setSelectedTicket({ ...selectedTicket, status: 'FECHADO' as any });
+        }
+      } else {
+        setErroInput("Erro ao finalizar chamado.");
+      }
+    } catch (error) {
+      console.error("Erro na rede:", error);
+      setErroInput("Erro de conexão ao finalizar chamado.");
+    }
   }
 
   function ajustarAltura(el: HTMLTextAreaElement) {
@@ -207,56 +256,48 @@ export default function TicketModal() {
     return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Gerencia o envio de mensagens textuais (WebSocket) e anexos binários (HTTP API Multipart)
   async function enviar() {
     if (!podeEnviar) return;
-
+  
     try {
       setEnviandoMensagem(true);
-
-      // CASO 1: A mensagem possui arquivos anexos (Garante envio HTTP POST no formato original)
+      const token = localStorage.getItem('token'); 
+  
       if (anexos.length > 0) {
         const formData = new FormData();
         formData.append('mensagem', texto.trim());
+        
         anexos.forEach((anexo) => {
-          if (anexo.arquivo) formData.append('arquivos', anexo.arquivo);
+          if (anexo.arquivo) formData.append('arquivo', anexo.arquivo); 
         });
 
-        // Utiliza o getAuthHeaders(true) original que você já tinha mapeado
-        const response = await fetch(`${API_URL}/chamados/${selectedTicket.id}/mensagens`, {
+        const response = await fetch(`${API_URL}/chamados/${selectedTicket.id}/anexos`, {
           method: 'POST',
-          headers: getAuthHeaders(true),
+          headers: {
+            'Authorization': `Bearer ${token}` 
+          },
           body: formData,
         });
 
         if (!response.ok) {
           throw new Error('Erro ao enviar anexos.');
         }
-      } 
-      // CASO 2: A mensagem é puramente texto (Envia via WebSocket/STOMP)
-      else {
+      } else {
         if (stompClientRef.current && stompClientRef.current.connected) {
           const chatMessage = { mensagem: texto.trim() };
           stompClientRef.current.send(`/app/chamado/${selectedTicket.id}/enviar`, {}, JSON.stringify(chatMessage));
         } else {
-          setErroInput("Você não está conectado ao chat. Feche e abra o chamado novamente.");
+          setErroInput("Você não está conectado ao chat.");
           return;
         }
       }
-
-      // Limpa os campos da interface após o envio com sucesso
+  
       setTexto('');
       setAnexos([]);
-      setErroInput('');
-      if (inputArquivoRef.current) inputArquivoRef.current.value = '';
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.value = '';
-      }
-
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
     } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
-      setErroInput("Falha ao enviar mensagem.");
+      console.error("Erro ao enviar:", error);
+      setErroInput("Falha ao enviar: verifique suas permissões.");
     } finally {
       setEnviandoMensagem(false);
     }
@@ -269,6 +310,8 @@ export default function TicketModal() {
     }
   }
 
+  const statusFormatado = selectedTicket.status?.toUpperCase() || '';
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
@@ -278,23 +321,48 @@ export default function TicketModal() {
         className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabeçalho */}
         <div className="px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-start justify-between gap-4">
             <h2 className="font-bold text-slate-800 text-lg">{selectedTicket.titulo}</h2>
+            
             <div className="flex items-center gap-2 shrink-0">
-              <span
-                className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase text-white ${bgPrioridade}`}
-              >
-                {selectedTicket.prioridade}
-              </span>
-              <button
-                onClick={fechar}
-                className="text-slate-400 hover:text-slate-600 transition-colors rounded-lg p-1 hover:bg-slate-100"
-              >
-                <X size={20} />
-              </button>
-            </div>
+  {ehTecnicoOuAdmin && (
+    <>
+      {statusFormatado === 'ABERTO' && (
+        <button
+          onClick={handleAssumirChamado}
+          className="flex items-center justify-center px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+        >
+          Assumir chamado
+        </button>
+      )}
+
+      {(statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && (
+        <button
+          onClick={handleFinalizarChamado}
+          className="flex items-center justify-center px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+        >
+          Finalizar chamado
+        </button>
+      )}
+
+      <div className="w-px h-5 bg-slate-200 mx-1"></div>
+    </>
+  )}
+
+  <span
+    className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase text-white ${bgPrioridade}`}
+  >
+    {selectedTicket.prioridade}
+  </span>
+  
+  <button
+    onClick={fechar}
+    className="text-slate-400 hover:text-slate-600 transition-colors rounded-lg p-1 hover:bg-slate-100"
+  >
+    <X size={20} />
+  </button>
+</div>
           </div>
 
           <div className="flex gap-2 mt-3">
@@ -308,7 +376,7 @@ export default function TicketModal() {
               className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-md text-slate-800"
               style={{ backgroundColor: statusColor }}
             >
-              {selectedTicket.status}
+              {formatarStatus(selectedTicket.status)}
             </span>
           </div>
 
@@ -326,7 +394,6 @@ export default function TicketModal() {
           <p className="text-sm text-slate-600 mt-3">{selectedTicket.descricao}</p>
         </div>
 
-        {/* Histórico de mensagens */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 bg-slate-50">
           {carregandoMensagens ? (
             <div className="text-center text-sm text-slate-400 py-8">Carregando mensagens...</div>
@@ -339,7 +406,6 @@ export default function TicketModal() {
           )}
         </div>
 
-        {/* Input do Chat */}
         <div className="p-4 bg-white border-t border-slate-100 rounded-b-xl">
           <div className="border border-slate-200 rounded-2xl bg-white px-4 py-3">
             {anexos.length > 0 && (
@@ -436,7 +502,12 @@ export default function TicketModal() {
                       key={anexo.nome}
                       className={`text-xs underline ${ehMinhaMensagem ? 'text-white/90' : 'text-slate-500'}`}
                     >
-                      <a href={anexo.url} target="_blank" rel="noreferrer">
+                      <a 
+                        href={anexo.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        download={anexo.nome}
+                      >
                         {anexo.nome}
                       </a>
                     </li>

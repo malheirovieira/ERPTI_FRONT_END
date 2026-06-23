@@ -1,6 +1,6 @@
 // src/pages/TI/SuporteTecnico/types/ticket.ts
 
-export type TicketStatus = 'Aberto' | 'Em andamento' | 'Aguardando cliente' | 'Resolvido' | 'Fechado';
+type TicketStatus = 'ABERTO' | 'EM_ANDAMENTO' | 'EM ANDAMENTO' | 'RESOLVIDO' | 'FECHADO';
 
 export type TicketPrioridade = 'Baixa' | 'Média' | 'Alta' | 'Crítica';
 
