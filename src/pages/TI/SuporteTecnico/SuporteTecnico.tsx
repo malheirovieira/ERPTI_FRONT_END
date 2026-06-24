@@ -10,9 +10,10 @@ import UsuarioBloqueadoModal from './components/UsuarioBloqueado';
 import { useTicketStore } from './store/useTicketStore';
 import { useAuthStore } from './store/useAuthStore';
 import type { Ticket } from './types/ticket';
+import { formatarStatus } from './utils/ticketUtils';
 
 export default function SuporteTecnico() {
-    const { tickets, loading: carregando, fetchTickets, setSelectedTicket } = useTicketStore();
+    const { tickets, fetchTickets, setSelectedTicket } = useTicketStore();
     const { usuario, fetchUsuarioLogado, isAdmin, isBloqueadoSuporte } = useAuthStore();
     const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
     const [ticketsFiltradosPorBusca, setTicketsFiltradosPorBusca] = useState<Ticket[] | null>(null);
@@ -28,12 +29,15 @@ export default function SuporteTecnico() {
     };
 
     const statusConfig: Record<string, string> = {
-        'Aberto': '#FAA72A', 'ABERTO': '#FAA72A',
-        'Em andamento': '#FBBD49', 'EM_ANDAMENTO': '#FBBD49',
-        'Aguardando cliente': '#DFF368',
-        'Resolvido': '#FAA72A', 'RESOLVIDO': '#RESOLVIDO',
-        'Fechado': '#FBBD49', 'FECHADO': '#FECHADO',
-    };
+        'Aberto': '#FAA72A', 
+        'ABERTO': '#FAA72A',
+        
+        'EM ANDAMENTO': '#B3EBF2', 
+        'EM_ANDAMENTO': '#B3EBF2',
+        
+        'Finalizado': '#dff368', 
+        'FECHADO': '#dff368',
+      };
 
     useEffect(() => {
         fetchTickets();
@@ -120,7 +124,12 @@ export default function SuporteTecnico() {
             >
                 {ticketsFiltrados.map((ticket) => {
                     const bgPrioridade = prioridadeConfig[ticket.prioridade] || prioridadeConfig[ticket.prioridade?.toUpperCase()] || 'bg-slate-500';
-                    const statusColor = statusConfig[ticket.status] || statusConfig[ticket.status?.toUpperCase()] || '#DFF368';
+                    
+                    // Agora o formatarStatus será encontrado porque você fez o import!
+                    const statusFormatado = formatarStatus(ticket.status || 'Pendente');
+                    
+                    // Busca a cor usando o nome amigável (ex: "Finalizado")
+                    const statusColor = statusConfig[statusFormatado] || statusConfig[statusFormatado.toUpperCase()] || '#DFF368';
                     
                     return (
                         <motion.div
@@ -131,8 +140,7 @@ export default function SuporteTecnico() {
                             }}
                             transition={{ duration: 0.8 }}
                             onClick={() => setSelectedTicket(ticket)}
-                            /* Ajustado para duration-[800ms] para ser exatamente 0.8s */
-                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-8 cursor-pointer overflow-hidden transition-all duration-[800ms] ease-in-out max-h-[130px] hover:max-h-[300px] hover:shadow-lg hover:border-orange-500"
+                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-8 cursor-pointer overflow-hidden transition-all duration-800 ease-in-out max-h-32.5 hover:max-h-75 hover:shadow-lg hover:border-orange-500"
                         >
                             <div className="flex justify-between items-start gap-4">
                                 <h3 className="font-bold text-slate-800 text-[17px]">{ticket.titulo}</h3>
@@ -145,8 +153,9 @@ export default function SuporteTecnico() {
                                 <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-md text-white" style={{ backgroundColor: 'rgb(233, 92, 19)' }}>
                                     {ticket.categoria}
                                 </span>
+                                {/* Aqui exibimos o status formatado */}
                                 <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-md text-slate-800" style={{ backgroundColor: statusColor }}>
-                                    {ticket.status}
+                                    {statusFormatado}
                                 </span>
                             </div>
 
@@ -159,7 +168,7 @@ export default function SuporteTecnico() {
                                 <span>{ticket.dataCriacao ? new Date(ticket.dataCriacao).toLocaleDateString('pt-BR') : '-'}</span>
                             </div>
 
-                            <div className="mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity duration-[800ms] ease-in-out">
+                            <div className="mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity duration-800 ease-in-out">
                                 <p className="text-[13px] text-slate-600 mb-4">{ticket.descricao}</p>
                                 <p className="font-semibold text-slate-700 text-[12px]">Responsável: {ticket.responsavel || 'Não atribuído'}</p>
                             </div>

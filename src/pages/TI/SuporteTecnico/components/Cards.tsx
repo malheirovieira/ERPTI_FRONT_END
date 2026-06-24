@@ -7,7 +7,14 @@ interface Props {
   onClick?: () => void;
 }
 
-// Configuração estética das badges de prioridade
+// Mapeamento de cores corrigido com as chaves formatadas
+const statusConfig: Record<string, string> = {
+  'Aberto': '#FAA72A',
+  'Em Andamento': '#294385',
+  'Resolvido': '#FAA72A',
+  'Finalizado': '#A0A0A0',
+};
+
 const prioridadeColors: Record<string, string> = {
   Baixa: 'bg-green-50 text-green-600',
   Média: 'bg-yellow-50 text-yellow-600',
@@ -20,16 +27,16 @@ const prioridadeColors: Record<string, string> = {
 };
 
 export default function TicketCard({ ticket, onClick }: Props) {
-  // Captura os valores já mapeados com segurança pela Store
   const prioridadeExibida = ticket.prioridade || 'N/A';
   const clienteExibido = ticket.cliente || 'Não informado';
   const usuarioExibido = ticket.usuario || 'Não informado';
+  
+  // Obtém o nome formatado (ex: "Finalizado")
+  const statusFormatado = formatarStatus(ticket.status || 'Pendente');
 
   return (
     <div
       onClick={onClick}
-      // h-full e flex flex-col permitem que o rodapé fique alinhado na base
-      // pb-6 garante o espaço inferior (respiro)
       className="p-4 pb-6 h-full flex flex-col border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-all bg-white"
     >
       <div className="flex justify-between items-start mb-2">
@@ -45,7 +52,6 @@ export default function TicketCard({ ticket, onClick }: Props) {
         {ticket.descricao}
       </p>
 
-      {/* mt-auto empurra este bloco para o final do card, criando o espaço necessário */}
       <div className="flex items-center justify-between text-xs text-gray-400 mt-auto">
         <div className="flex items-center gap-2">
           <User size={14} />
@@ -56,10 +62,13 @@ export default function TicketCard({ ticket, onClick }: Props) {
           </span>
         </div>
 
-        <div className="flex items-center gap-1 font-medium text-gray-600">
+        {/* Status com a cor aplicada dinamicamente */}
+        <div 
+          className="flex items-center gap-1 font-medium px-2 py-1 rounded-md text-white"
+          style={{ backgroundColor: statusConfig[statusFormatado] || '#A0A0A0' }}
+        >
           <Clock size={14} />
-          {/* A função formatarStatus irá corrigir o texto EM_ANDAMENTO */}
-          {formatarStatus(ticket.status || 'Pendente')}
+          {statusFormatado}
         </div>
       </div>
     </div>

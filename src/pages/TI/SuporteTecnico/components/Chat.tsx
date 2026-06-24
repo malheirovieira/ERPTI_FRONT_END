@@ -27,18 +27,17 @@ const statusConfig: Record<string, string> = {
   'Aberto': '#FAA72A',
   'ABERTO': '#FAA72A',
   'Em andamento': '#FBBD49',
-  'EM_ANDAMENTO': '#FBBD49',
+  'EM ANDAMENTO': '#FBBD49',
   'Aguardando cliente': '#DFF368',
   'Resolvido': '#FAA72A',
   'RESOLVIDO': '#FAA72A',
-  'Fechado': '#FBBD49',
-  'FECHADO': '#FBBD49',
+  'Finalizado': '#A0A0A0', // Adicionado
+  'FECHADO': '#A0A0A0',   // Mantido para compatibilidade
 };
 
 export default function TicketModal() {
   const selectedTicket = useTicketStore((state) => state.selectedTicket);
   const setSelectedTicket = useTicketStore((state) => state.setSelectedTicket);
-  // Função para atualizar o painel ao fundo automaticamente
   const updateTicket = useTicketStore((state: any) => state.updateTicket);
 
   const [mensagens, setMensagens] = useState<TicketChatMensagem[]>([]);
@@ -153,9 +152,8 @@ export default function TicketModal() {
   if (!selectedTicket) return null;
 
   const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || prioridadeConfig[selectedTicket.prioridade?.toUpperCase()] || 'bg-slate-500';
-  const statusColor = statusConfig[selectedTicket.status] || statusConfig[selectedTicket.status?.toUpperCase()] || '#DFF368';
+  const statusColor = statusConfig[formatarStatus(selectedTicket.status)] || '#DFF368';
 
-  // Higienização completa das roles e status para evitar erros de case-sensitive ou espaços em branco
   const roleFormatada = usuarioLogado?.role?.trim().toUpperCase() || '';
   const ehTecnicoOuAdmin = roleFormatada === 'TECNICO' || roleFormatada === 'ADMIN';
   const statusFormatado = selectedTicket.status?.trim().toUpperCase() || '';
@@ -189,10 +187,7 @@ export default function TicketModal() {
               'Responsável',
           };
 
-          // Atualiza o modal local
           setSelectedTicket(ticketFormatado);
-          
-          // Atualiza o card de fundo no Dashboard automaticamente
           if (updateTicket) updateTicket(ticketFormatado);
         }
       } else {
@@ -207,7 +202,6 @@ export default function TicketModal() {
 
   async function handleFinalizarChamado() {
     try {
-      // Alterado para método PUT para seguir a especificação da API e evitar o erro de CORS
       const response = await fetch(`${API_URL}/chamados/${selectedTicket?.id}`, {
         method: 'PUT',
         headers: { 
@@ -220,11 +214,7 @@ export default function TicketModal() {
       if (response.ok) {
         if (selectedTicket) {
           const ticketFinalizado = { ...selectedTicket, status: 'FECHADO' as any };
-          
-          // Atualiza o modal local
           setSelectedTicket(ticketFinalizado);
-
-          // Atualiza o card de fundo no Dashboard automaticamente
           if (updateTicket) updateTicket(ticketFinalizado);
         }
       } else {
@@ -350,7 +340,6 @@ export default function TicketModal() {
             <div className="flex items-center gap-2 shrink-0">
               {ehTecnicoOuAdmin && (
                 <>
-                  {/* CONDIÇÃO CORRIGIDA: Exibe se o status for ABERTO OU se estiver em andamento sem nenhum técnico */}
                   {(statusFormatado === 'ABERTO' || 
                     ((statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && semResponsavel)
                   ) && (
@@ -362,7 +351,6 @@ export default function TicketModal() {
                     </button>
                   )}
 
-                  {/* CONDIÇÃO FINALIZAR: Só permite finalizar se já tiver um responsável e se for o técnico dono ou ADMIN */}
                   {(statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && 
                    (!semResponsavel && (selectedTicket.responsavel === usuarioLogado?.nome || roleFormatada === 'ADMIN')) && (
                     <button

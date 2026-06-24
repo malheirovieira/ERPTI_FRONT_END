@@ -9,22 +9,26 @@ interface DashboardCardsProps {
 
 export default function DashboardCards({ tickets, selectedStatus, onSelectStatus }: DashboardCardsProps) {
   
-  // Função robusta para contar status, normalizando o texto para evitar erro de Case Sensitive
   const countByStatus = (status: string) => {
-    // Normaliza para comparar: 'Aberto', 'Em andamento', 'Resolvido', 'Fechado'
     const normalizedStatus = status.toLowerCase();
 
+    // Lógica para o card de Finalizados (Resolvido + Finalizado/Fechado)
     if (normalizedStatus === 'resolvido') {
-      return tickets.filter(t => 
-        t.status?.toLowerCase() === 'resolvido' || 
-        t.status?.toLowerCase() === 'fechado'
-      ).length;
+      return tickets.filter(t => {
+        const s = t.status?.toLowerCase();
+        return s === 'resolvido' || s === 'finalizado' || s === 'fechado';
+      }).length;
     }
 
+    // Lógica para Em Andamento
     if (normalizedStatus === 'em andamento') {
-      return tickets.filter(t => t.status?.toLowerCase() === 'em andamento' || t.status?.toLowerCase() === 'em_andamento').length;
+      return tickets.filter(t => {
+        const s = t.status?.toLowerCase();
+        return s === 'em andamento' || s === 'em_andamento';
+      }).length;
     }
 
+    // Lógica padrão para Aberto
     return tickets.filter(t => t.status?.toLowerCase() === normalizedStatus).length;
   };
 
@@ -50,7 +54,7 @@ export default function DashboardCards({ tickets, selectedStatus, onSelectStatus
       title: 'Finalizados', 
       count: countByStatus('Resolvido'), 
       icon: CheckCircle, 
-      color: 'text-green-600', 
+      color: 'text-green-600',
       bg: 'bg-green-50' 
     },
   ];
