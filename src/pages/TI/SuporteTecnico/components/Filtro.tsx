@@ -45,7 +45,9 @@ export default function TicketFilters({ tickets, onFilterChange }: TicketFilters
         String(t.id).includes(valores.busca.trim()) ||
         t.titulo.toLowerCase().includes(valores.busca.trim().toLowerCase());
       const categoriaOk = valores.categoria === '' || t.categoria === valores.categoria;
-      const prioridadeOk = valores.prioridade === '' || t.prioridade === valores.prioridade;
+      const prioridadeOk = 
+        valores.prioridade === '' || 
+        (t.prioridade?.toLowerCase() === valores.prioridade.toLowerCase());
       const clienteOk = valores.cliente === '' || t.cliente === valores.cliente;
 
       let dataOk = true;
