@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Plus, Users, FileBarChart } from 'lucide-react';
 import { motion } from 'framer-motion';
-import DashboardCards from './components/TicketDashboard';
-import TicketFilters from './components/TicketFiltro';
-import TicketModal from './components/TicketChat';
-import NovoChamadoModal from './components/TicketCriacao';
+import DashboardCards from './components/Dashboard';
+import TicketFilters from './components/Filtro';
+import TicketModal from './components/Chat';
+import NovoChamadoModal from './components/Abertura';
+import UsuariosModal from './components/Usuarios';
+import UsuarioBloqueadoModal from './components/UsuarioBloqueado';
 import { useTicketStore } from './store/useTicketStore';
 import { useAuthStore } from './store/useAuthStore';
 import type { Ticket } from './types/ticket';
 
 export default function SuporteTecnico() {
     const { tickets, loading: carregando, fetchTickets, setSelectedTicket } = useTicketStore();
-    const { usuario, fetchUsuarioLogado, isAdmin } = useAuthStore();
+    const { usuario, fetchUsuarioLogado, isAdmin, isBloqueadoSuporte } = useAuthStore();
     const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
     const [ticketsFiltradosPorBusca, setTicketsFiltradosPorBusca] = useState<Ticket[] | null>(null);
     const [modalNovoChamadoAberto, setModalNovoChamadoAberto] = useState(false);
+    const [modalUsuariosAberto, setModalUsuariosAberto] = useState(false);
     const usuarioLogado = usuario?.nome || 'João Silva';
 
     const prioridadeConfig: Record<string, string> = {
@@ -37,6 +40,20 @@ export default function SuporteTecnico() {
         fetchUsuarioLogado();
     }, [fetchTickets, fetchUsuarioLogado]);
 
+    const bloqueado = isBloqueadoSuporte();
+
+    // Enquanto o usuário estiver bloqueado, verifica periodicamente se foi
+    // reativado pelo administrador, para o modal sumir automaticamente.
+    useEffect(() => {
+        if (!bloqueado) return;
+
+        const intervalo = setInterval(() => {
+            fetchUsuarioLogado();
+        }, 10000);
+
+        return () => clearInterval(intervalo);
+    }, [bloqueado, fetchUsuarioLogado]);
+
     const baseTickets = ticketsFiltradosPorBusca ?? tickets;
 
     const ticketsFiltrados = baseTickets.filter(ticket => {
@@ -54,14 +71,15 @@ export default function SuporteTecnico() {
     });
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="relative">
+            <div className={`p-6 space-y-6 ${bloqueado ? 'pointer-events-none select-none blur-[1px]' : ''}`} aria-hidden={bloqueado}>
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-bold text-slate-800">Suporte Técnico</h1>
                 <div className="flex items-center gap-3">
                     {isAdmin() && (
                         <>
                             <button
-                                onClick={() => {/* navegação para tela de Usuários */}}
+                                onClick={() => setModalUsuariosAberto(true)}
                                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-out hover:opacity-90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98]"
                                 style={{ backgroundColor: 'rgb(243, 152, 109)' }}
                             >
@@ -151,7 +169,11 @@ export default function SuporteTecnico() {
             </motion.div>
 
             <TicketModal />
+            <UsuariosModal aberto={modalUsuariosAberto} onClose={() => setModalUsuariosAberto(false)} />
             <NovoChamadoModal aberto={modalNovoChamadoAberto} onClose={() => setModalNovoChamadoAberto(false)} onSubmit={() => {fetchTickets(); setModalNovoChamadoAberto(false);}} usuarioLogado={usuarioLogado} />
+            </div>
+
+            {bloqueado && <UsuarioBloqueadoModal />}
         </div>
     );
 }

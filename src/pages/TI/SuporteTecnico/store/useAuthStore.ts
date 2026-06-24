@@ -19,6 +19,7 @@ interface AuthStoreState {
     loading: boolean;
     fetchUsuarioLogado: () => Promise<void>;
     isAdmin: () => boolean;
+    isBloqueadoSuporte: () => boolean;
 }
 
 export const useAuthStore = create<AuthStoreState>((set, get) => ({
@@ -48,4 +49,13 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     },
 
     isAdmin: () => get().usuario?.role === 'ADMIN',
+
+    // ADMIN nunca é bloqueado, mesmo se ativo === false.
+    // USER e TECNICO são bloqueados do Suporte Técnico quando ativo === false.
+    isBloqueadoSuporte: () => {
+        const usuario = get().usuario;
+        if (!usuario) return false;
+        if (usuario.role === 'ADMIN') return false;
+        return usuario.ativo === false;
+    },
 }));
