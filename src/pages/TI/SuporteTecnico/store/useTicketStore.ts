@@ -11,9 +11,12 @@ interface TicketStoreState {
   selectedTicket: Ticket | null;
   setSelectedTicket: (ticket: Ticket | null) => void;
   updateSelectedTicket: (atualizacao: Partial<Ticket>) => void;
+  
+  // ADICIONADO: Função para atualizar a lista global do Dashboard sem dar F5
+  updateTicket: (updatedTicket: any) => void;
 }
 
-//  FUNÇÃO DE FORMATAÇÃO VISUAL DOS NOMES (Empresas / Usuários)
+// FUNÇÃO DE FORMATAÇÃO VISUAL DOS NOMES (Empresas / Usuários)
 const formatarNome = (texto: string | undefined | null): string => {
   if (!texto) return 'Não informado';
 
@@ -58,8 +61,9 @@ export const useTicketStore = create<TicketStoreState>((set) => ({
             ...chamado,
             prioridade: chamado.prioridade || chamado.criticidade || 'Baixa',
             status: chamado.status || 'Aberto',
+            responsavel: chamado.tecnicoPrincipal?.nome || chamado.responsavel || 'Não atribuído',
             
-            //  Aplica a formatação embelezedora aqui
+            // Aplica a formatação embelezedora aqui
             cliente: formatarNome(empresaBruta),
             usuario: formatarNome(usuarioBruto),
           };
@@ -82,4 +86,26 @@ export const useTicketStore = create<TicketStoreState>((set) => ({
         ? { selectedTicket: { ...state.selectedTicket, ...atualizacao } }
         : state
     ),
+
+  // ADICIONADO: Implementação da atualização dinâmica no background
+  updateTicket: (updatedTicket) =>
+    set((state) => ({
+      tickets: state.tickets.map((ticket) => {
+        if (ticket.id === updatedTicket.id) {
+          // Garante que os dados originais brutos não se percam na atualização
+          const empresaBruta = updatedTicket.empresa || updatedTicket.cliente || ticket.cliente;
+          const usuarioBruto = updatedTicket.usuarioAbriu?.nome || updatedTicket.usuario || ticket.usuario;
+          
+          return {
+            ...ticket,
+            ...updatedTicket,
+            // Re-aplica a sua formatação para não bugar o card
+            cliente: formatarNome(empresaBruta),
+            usuario: formatarNome(usuarioBruto),
+            responsavel: updatedTicket.tecnicoPrincipal?.nome || updatedTicket.responsavel || ticket.responsavel || 'Não atribuído'
+          };
+        }
+        return ticket;
+      }),
+    })),
 }));

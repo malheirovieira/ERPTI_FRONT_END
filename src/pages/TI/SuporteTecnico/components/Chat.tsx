@@ -38,6 +38,8 @@ const statusConfig: Record<string, string> = {
 export default function TicketModal() {
   const selectedTicket = useTicketStore((state) => state.selectedTicket);
   const setSelectedTicket = useTicketStore((state) => state.setSelectedTicket);
+  // Função para atualizar o painel ao fundo automaticamente
+  const updateTicket = useTicketStore((state: any) => state.updateTicket);
 
   const [mensagens, setMensagens] = useState<TicketChatMensagem[]>([]);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
@@ -153,7 +155,11 @@ export default function TicketModal() {
   const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || prioridadeConfig[selectedTicket.prioridade?.toUpperCase()] || 'bg-slate-500';
   const statusColor = statusConfig[selectedTicket.status] || statusConfig[selectedTicket.status?.toUpperCase()] || '#DFF368';
 
-  const ehTecnicoOuAdmin = usuarioLogado?.role === 'TECNICO' || usuarioLogado?.role === 'ADMIN';
+  // Higienização completa das roles e status para evitar erros de case-sensitive ou espaços em branco
+  const roleFormatada = usuarioLogado?.role?.trim().toUpperCase() || '';
+  const ehTecnicoOuAdmin = roleFormatada === 'TECNICO' || roleFormatada === 'ADMIN';
+  const statusFormatado = selectedTicket.status?.trim().toUpperCase() || '';
+  const semResponsavel = !selectedTicket.responsavel || selectedTicket.responsavel.trim() === '' || selectedTicket.responsavel === 'Não atribuído';
 
   function fechar() {
     setSelectedTicket(null);
@@ -169,14 +175,25 @@ export default function TicketModal() {
         method: 'PUT',
         headers: getAuthHeaders(),
       });
-  
+
       if (response.ok) {
+        const chamadoAtualizado = await response.json();
+
         if (selectedTicket) {
-          setSelectedTicket({ 
-            ...selectedTicket, 
-            status: 'EM_ANDAMENTO' as any, 
-            responsavel: usuarioLogado?.nome || 'Responsável' 
-          });
+          const ticketFormatado = {
+            ...selectedTicket,
+            status: chamadoAtualizado.status ?? 'EM_ANDAMENTO',
+            responsavel:
+              chamadoAtualizado.tecnicoPrincipal?.nome ||
+              usuarioLogado?.nome ||
+              'Responsável',
+          };
+
+          // Atualiza o modal local
+          setSelectedTicket(ticketFormatado);
+          
+          // Atualiza o card de fundo no Dashboard automaticamente
+          if (updateTicket) updateTicket(ticketFormatado);
         }
       } else {
         const erro = await response.text();
@@ -190,8 +207,9 @@ export default function TicketModal() {
 
   async function handleFinalizarChamado() {
     try {
-      const response = await fetch(`${API_URL}/chamados/${selectedTicket?.id}/status`, {
-        method: 'PATCH',
+      // Alterado para método PUT para seguir a especificação da API e evitar o erro de CORS
+      const response = await fetch(`${API_URL}/chamados/${selectedTicket?.id}`, {
+        method: 'PUT',
         headers: { 
           ...getAuthHeaders(), 
           'Content-Type': 'application/json' 
@@ -201,7 +219,13 @@ export default function TicketModal() {
 
       if (response.ok) {
         if (selectedTicket) {
-          setSelectedTicket({ ...selectedTicket, status: 'FECHADO' as any });
+          const ticketFinalizado = { ...selectedTicket, status: 'FECHADO' as any };
+          
+          // Atualiza o modal local
+          setSelectedTicket(ticketFinalizado);
+
+          // Atualiza o card de fundo no Dashboard automaticamente
+          if (updateTicket) updateTicket(ticketFinalizado);
         }
       } else {
         setErroInput("Erro ao finalizar chamado.");
@@ -310,8 +334,6 @@ export default function TicketModal() {
     }
   }
 
-  const statusFormatado = selectedTicket.status?.toUpperCase() || '';
-
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
@@ -326,43 +348,48 @@ export default function TicketModal() {
             <h2 className="font-bold text-slate-800 text-lg">{selectedTicket.titulo}</h2>
             
             <div className="flex items-center gap-2 shrink-0">
-  {ehTecnicoOuAdmin && (
-    <>
-      {statusFormatado === 'ABERTO' && (
-        <button
-          onClick={handleAssumirChamado}
-          className="flex items-center justify-center px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
-        >
-          Assumir chamado
-        </button>
-      )}
+              {ehTecnicoOuAdmin && (
+                <>
+                  {/* CONDIÇÃO CORRIGIDA: Exibe se o status for ABERTO OU se estiver em andamento sem nenhum técnico */}
+                  {(statusFormatado === 'ABERTO' || 
+                    ((statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && semResponsavel)
+                  ) && (
+                    <button
+                      onClick={handleAssumirChamado}
+                      className="flex items-center justify-center px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer mr-1"
+                    >
+                      Assumir chamado
+                    </button>
+                  )}
 
-      {(statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && (
-        <button
-          onClick={handleFinalizarChamado}
-          className="flex items-center justify-center px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
-        >
-          Finalizar chamado
-        </button>
-      )}
+                  {/* CONDIÇÃO FINALIZAR: Só permite finalizar se já tiver um responsável e se for o técnico dono ou ADMIN */}
+                  {(statusFormatado === 'EM_ANDAMENTO' || statusFormatado === 'EM ANDAMENTO') && 
+                   (!semResponsavel && (selectedTicket.responsavel === usuarioLogado?.nome || roleFormatada === 'ADMIN')) && (
+                    <button
+                      onClick={handleFinalizarChamado}
+                      className="flex items-center justify-center px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 cursor-pointer"
+                    >
+                      Finalizar chamado
+                    </button>
+                  )}
 
-      <div className="w-px h-5 bg-slate-200 mx-1"></div>
-    </>
-  )}
+                  <div className="w-px h-5 bg-slate-200 mx-1"></div>
+                </>
+              )}
 
-  <span
-    className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase text-white ${bgPrioridade}`}
-  >
-    {selectedTicket.prioridade}
-  </span>
-  
-  <button
-    onClick={fechar}
-    className="text-slate-400 hover:text-slate-600 transition-colors rounded-lg p-1 hover:bg-slate-100"
-  >
-    <X size={20} />
-  </button>
-</div>
+              <span
+                className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase text-white ${bgPrioridade}`}
+              >
+                {selectedTicket.prioridade}
+              </span>
+              
+              <button
+                onClick={fechar}
+                className="text-slate-400 hover:text-slate-600 transition-colors rounded-lg p-1 hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-2 mt-3">
