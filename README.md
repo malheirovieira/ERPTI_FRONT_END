@@ -1,4 +1,4 @@
-# 🚀 [ERP TI]
+# 🚀 ERP TI
 
 > [Adicione aqui uma breve descrição de 1 ou 2 parágrafos explicando o que o seu projeto faz, qual problema ele resolve e por que foi criado.]
 
