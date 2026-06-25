@@ -100,7 +100,7 @@ export default function TicketFilters({ tickets, onFilterChange }: TicketFilters
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-55">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
           <input
             type="text"
@@ -136,7 +136,7 @@ function FiltroSelect({ value, onChange, placeholder, options }: { value: string
   const ativo = value !== '';
   return (
     <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={`appearance-none pl-3 pr-8 py-2.5 text-sm rounded-lg border outline-none cursor-pointer min-w-[140px] ${ativo ? 'border-[rgb(233,92,19)] bg-orange-50 text-[rgb(233,92,19)]' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={`appearance-none pl-3 pr-8 py-2.5 text-sm rounded-lg border outline-none cursor-pointer min-w-35 ${ativo ? 'border-[rgb(233,92,19)] bg-orange-50 text-[rgb(233,92,19)]' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
         <option value="">{placeholder}</option>
         {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
       </select>

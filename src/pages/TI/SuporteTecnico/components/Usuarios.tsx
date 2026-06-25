@@ -95,7 +95,7 @@ export default function UsuariosModal({ aberto, onClose }: UsuariosModalProps) {
 
                 {/* Filtros */}
                 <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[200px]">
+                    <div className="relative flex-1 min-w-50">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
@@ -167,7 +167,7 @@ export default function UsuariosModal({ aberto, onClose }: UsuariosModalProps) {
             {/* Modal de confirmação de inativar/reativar */}
             {acaoPendente && (
                 <div
-                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4"
+                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-60 p-4"
                     onClick={() => setAcaoPendente(null)}
                 >
                     <div
