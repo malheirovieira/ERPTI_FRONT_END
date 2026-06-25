@@ -23,4 +23,4 @@ Siga os passos abaixo para rodar o projeto localmente na sua máquina.
 
 1. Clone este repositório:
 ```bash
-git clone [https://github.com/seu-usuario/nome-do-repositorio.git](https://github.com/seu-usuario/nome-do-repositorio.git)
+git clone https://github.com/malheirovieira/erp_ti.git
