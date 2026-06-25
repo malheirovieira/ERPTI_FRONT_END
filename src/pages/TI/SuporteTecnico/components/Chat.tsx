@@ -24,7 +24,6 @@ const statusConfig: Record<string, string> = {
   'Finalizado': '#dff368', 'FECHADO': '#dff368',
 };
 
-// Componente de avatar com iniciais — fora do modal para não violar regras de hooks
 function UserAvatar({ nome, size = 'sm', clickable = false, onClick, extraClass = '' }: {
   nome: string;
   size?: 'sm' | 'md';
@@ -68,6 +67,7 @@ export default function TicketModal() {
   const selectedTicket = useTicketStore((state) => state.selectedTicket);
   const setSelectedTicket = useTicketStore((state) => state.setSelectedTicket);
   const updateTicket = useTicketStore((state: any) => state.updateTicket);
+  const fetchTickets = useTicketStore((state: any) => state.fetchTickets); // ← NOVO
 
   const [mensagens, setMensagens] = useState<TicketChatMensagem[]>([]);
   const [carregandoMensagens, setCarregandoMensagens] = useState(false);
@@ -77,14 +77,15 @@ export default function TicketModal() {
   const [anexos, setAnexos] = useState<TicketAnexo[]>([]);
   const [erroInput, setErroInput] = useState('');
 
-  // Estado do modal de participantes
   const [modalParticipanteAberto, setModalParticipanteAberto] = useState(false);
   const [participantesNoChamado, setParticipantesNoChamado] = useState<{ id: number; nome: string; email: string; papel: string }[]>([]);
-  const [usuariosDisponiveis, setUsuariosDisponiveis] = useState<{ id: number; nome: string; email: string; role: string }[]>([]);
+  const [usuariosDisponiveis, setUsuariosDisponiveis] = useState<{ id: number; nome: string; email: string; role: string; setor?: string }[]>([]);
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(false);
   const [adicionandoId, setAdicionandoId] = useState<number | null>(null);
   const [removendoId, setRemovendoId] = useState<number | null>(null);
   const [feedbackParticipante, setFeedbackParticipante] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null);
+  const [filtroBusca, setFiltroBusca] = useState('');
+  const [filtroSetor, setFiltroSetor] = useState('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
@@ -95,8 +96,6 @@ export default function TicketModal() {
   const statusFormatado = selectedTicket?.status?.trim().toUpperCase() || '';
   const isFinalizado = statusFormatado === 'FECHADO' || statusFormatado === 'FINALIZADO';
   const podeEnviar = !isFinalizado && (texto.trim() !== '' || anexos.length > 0) && !disabled;
-
-  // ─── Hooks — todos antes do early return ────────────────────────────────────
 
   useEffect(() => {
     async function carregarPerfilUsuario() {
@@ -117,7 +116,6 @@ export default function TicketModal() {
       return;
     }
 
-    // Reseta participantes ao trocar de chamado
     setParticipantesNoChamado([]);
 
     async function carregarHistoricoChat() {
@@ -142,7 +140,6 @@ export default function TicketModal() {
       }
     }
 
-    // Busca silenciosa de participantes para popular os avatares na stack
     async function carregarParticipantesIniciais() {
       try {
         const res = await fetch(`${API_URL}/chamados/${selectedTicket.id}/participantes`, { headers: getAuthHeaders() });
@@ -158,7 +155,7 @@ export default function TicketModal() {
           );
         }
       } catch {
-        // silencioso — avatares simplesmente não aparecem se falhar
+        // silencioso
       }
     }
 
@@ -197,7 +194,6 @@ export default function TicketModal() {
     };
   }, [selectedTicket]);
 
-  // Fecha o mini modal ao clicar fora — deve ficar ANTES do early return
   useEffect(() => {
     if (!modalParticipanteAberto) return;
     function handleClickFora(e: MouseEvent) {
@@ -209,24 +205,19 @@ export default function TicketModal() {
     return () => document.removeEventListener('mousedown', handleClickFora);
   }, [modalParticipanteAberto]);
 
-  // ─── Early return após todos os hooks ───────────────────────────────────────
   if (!selectedTicket) return null;
 
-  // ─── Variáveis derivadas ─────────────────────────────────────────────────────
   const bgPrioridade = prioridadeConfig[selectedTicket.prioridade] || prioridadeConfig[selectedTicket.prioridade?.toUpperCase()] || 'bg-slate-500';
   const statusColor = statusConfig[formatarStatus(selectedTicket.status)] || statusConfig[formatarStatus(selectedTicket.status).toUpperCase()] || '#DFF368';
   const roleFormatada = usuarioLogado?.role?.trim().toUpperCase() || '';
   const ehTecnicoOuAdmin = roleFormatada === 'TECNICO' || roleFormatada === 'ADMIN';
   const semResponsavel = !selectedTicket.responsavel || selectedTicket.responsavel.trim() === '' || selectedTicket.responsavel === 'Não atribuído';
 
-  // Pode convidar: admin, técnico, ou o criador do chamado
   const ehCriador = !!usuarioLogado && (
     usuarioLogado.nome === (selectedTicket.usuario || selectedTicket.usuarioAbriu?.nome) ||
     usuarioLogado.id === selectedTicket.usuarioAbriu?.id
   );
   const podeConvidar = ehTecnicoOuAdmin || ehCriador;
-
-  // ─── Handlers ────────────────────────────────────────────────────────────────
 
   function fechar() {
     setSelectedTicket(null);
@@ -276,9 +267,10 @@ export default function TicketModal() {
   async function abrirModalParticipante() {
     setModalParticipanteAberto(true);
     setFeedbackParticipante(null);
+    setFiltroBusca('');
+    setFiltroSetor('');
     setCarregandoUsuarios(true);
     try {
-      // Busca todos os usuários e os participantes já no chamado em paralelo
       const [resUsuarios, resParticipantes] = await Promise.all([
         fetch(`${API_URL}/usuarios`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/chamados/${selectedTicket.id}/participantes`, { headers: getAuthHeaders() }),
@@ -287,7 +279,6 @@ export default function TicketModal() {
       const todosUsuarios = resUsuarios.ok ? await resUsuarios.json() : [];
       const participantes = resParticipantes.ok ? await resParticipantes.json() : [];
 
-      // IDs já no chamado: criador + técnico principal + participantes
       const idsNoCall = new Set<number>();
       if (selectedTicket.usuarioAbriu?.id) idsNoCall.add(selectedTicket.usuarioAbriu.id);
       if ((selectedTicket as any).tecnicoPrincipal?.id) idsNoCall.add((selectedTicket as any).tecnicoPrincipal.id);
@@ -302,12 +293,19 @@ export default function TicketModal() {
         }))
       );
 
-      // Disponíveis = ativos que ainda não estão no chamado
       setUsuariosDisponiveis(
-        todosUsuarios.filter((u: any) => {
-          if (u.bloqueado || u.ativo === false) return false;
-          return !idsNoCall.has(u.id);
-        })
+        todosUsuarios
+          .filter((u: any) => {
+            if (u.bloqueado || u.ativo === false) return false;
+            return !idsNoCall.has(u.id);
+          })
+          .map((u: any) => ({
+            id: u.id,
+            nome: u.nome || '',
+            email: u.email || '',
+            role: u.role || '',
+            setor: u.departamento?.nome || u.setor || u.departamento || '',
+          }))
       );
     } catch {
       setFeedbackParticipante({ tipo: 'erro', msg: 'Erro ao carregar usuários.' });
@@ -328,12 +326,12 @@ export default function TicketModal() {
       const msg = await response.text();
       if (response.ok) {
         setFeedbackParticipante({ tipo: 'ok', msg });
-        // Move o usuário de "disponíveis" para "no chamado" localmente
         const novoParticipante = usuariosDisponiveis.find((u) => u.id === idUsuario);
         if (novoParticipante) {
           setParticipantesNoChamado((prev) => [...prev, { ...novoParticipante, papel: 'OBSERVADOR' }]);
           setUsuariosDisponiveis((prev) => prev.filter((u) => u.id !== idUsuario));
         }
+        fetchTickets(); // ← atualiza a lista em tempo real
       } else {
         setFeedbackParticipante({ tipo: 'erro', msg: msg || 'Erro ao adicionar participante.' });
       }
@@ -360,6 +358,7 @@ export default function TicketModal() {
         if (removido) {
           setUsuariosDisponiveis((prev) => [...prev, { id: removido.id, nome: removido.nome, email: removido.email, role: '' }]);
         }
+        fetchTickets(); // ← atualiza a lista em tempo real
       } else {
         setFeedbackParticipante({ tipo: 'erro', msg: msg || 'Erro ao remover participante.' });
       }
@@ -441,12 +440,10 @@ export default function TicketModal() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); }
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={fechar}>
       <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
 
-        {/* Cabeçalho */}
         <div className="px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-start justify-between gap-4">
             <h2 className="font-bold text-slate-800 text-lg">{selectedTicket.titulo}</h2>
@@ -481,7 +478,6 @@ export default function TicketModal() {
             </div>
           </div>
 
-          {/* Badges: empresa (laranja) + categoria + status */}
           <div className="flex gap-2 mt-3 items-center">
             <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-md text-white" style={{ backgroundColor: LARANJA }}>
               {selectedTicket.cliente || selectedTicket.empresa}
@@ -494,10 +490,7 @@ export default function TicketModal() {
             </span>
           </div>
 
-          {/* Linha: avatares sobrepostos + responsável */}
           <div className="flex justify-between items-center mt-4 relative">
-
-            {/* Stack de avatares com sobreposição */}
             <div className="flex items-center">
               <style>{`
                 .avatar-stack { display: flex; align-items: center; }
@@ -527,7 +520,6 @@ export default function TicketModal() {
                 .avatar-add-btn:hover { transform: scale(1.12); }
               `}</style>
               <div className="avatar-stack">
-                {/* Avatar do criador — não abre modal */}
                 {(selectedTicket.usuario || selectedTicket.usuarioAbriu?.nome) && (
                   <UserAvatar
                     nome={selectedTicket.usuario || selectedTicket.usuarioAbriu?.nome || '?'}
@@ -535,7 +527,6 @@ export default function TicketModal() {
                     extraClass="avatar-stack-item"
                   />
                 )}
-                {/* Avatares dos participantes já adicionados */}
                 {participantesNoChamado.map((p) => (
                   <UserAvatar
                     key={p.id}
@@ -544,7 +535,6 @@ export default function TicketModal() {
                     extraClass="avatar-stack-item"
                   />
                 ))}
-                {/* Botão + apenas para quem pode convidar */}
                 {podeConvidar && (
                   <button
                     onClick={abrirModalParticipante}
@@ -565,7 +555,6 @@ export default function TicketModal() {
               Responsável: <span className="text-slate-700">{selectedTicket.responsavel || 'Não atribuído'}</span>
             </span>
 
-            {/* Mini modal de participantes */}
             {modalParticipanteAberto && (
               <div
                 ref={modalParticipanteRef}
@@ -587,10 +576,8 @@ export default function TicketModal() {
                   <div className="text-center text-[12px] text-slate-400 py-8">Carregando...</div>
                 ) : (
                   <>
-                    {/* Seção: no chamado */}
                     <div className="px-4 pt-3 pb-1">
                       <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">No chamado</p>
-                      {/* Criador */}
                       <div className="flex items-center gap-2.5 py-1.5">
                         <UserAvatar nome={selectedTicket.usuario || selectedTicket.usuarioAbriu?.nome || '?'} size="md" />
                         <div className="flex-1 min-w-0">
@@ -598,7 +585,6 @@ export default function TicketModal() {
                           <p className="text-[10px] text-slate-400">Criador</p>
                         </div>
                       </div>
-                      {/* Participantes já adicionados */}
                       {participantesNoChamado.map((p) => (
                         <div key={p.id} className="flex items-center gap-2.5 py-1.5 group/item">
                           <UserAvatar nome={p.nome} size="md" />
@@ -620,39 +606,73 @@ export default function TicketModal() {
                       ))}
                     </div>
 
-                    {/* Divisor e seção Adicionar — apenas para quem pode convidar */}
-                    {podeConvidar && (
-                      <>
-                        <div className="mx-4 my-2 border-t border-slate-100" />
-                        <div className="px-4 pb-1">
-                          <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Adicionar</p>
-                        </div>
-                        <div className="max-h-44 overflow-y-auto pb-2">
-                          {usuariosDisponiveis.length === 0 ? (
-                            <p className="text-center text-[12px] text-slate-400 py-4">Nenhum usuário disponível.</p>
-                          ) : (
-                            usuariosDisponiveis.map((u) => (
-                              <button
-                                key={u.id}
-                                onClick={() => adicionarParticipante(u.id)}
-                                disabled={adicionandoId === u.id}
-                                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-orange-50 transition-colors text-left disabled:opacity-60"
-                              >
-                                <UserAvatar nome={u.nome} size="md" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[12px] font-semibold text-slate-700 truncate">{u.nome}</p>
-                                  <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
-                                </div>
-                                {adicionandoId === u.id
-                                  ? <span className="text-[10px] text-slate-400 shrink-0">Adicionando...</span>
-                                  : <span className="text-[10px] font-bold shrink-0" style={{ color: LARANJA }}>+ Convidar</span>
-                                }
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </>
-                    )}
+                    {podeConvidar && (() => {
+                      const setoresUnicos = Array.from(
+                        new Set(usuariosDisponiveis.map((u) => u.setor).filter(Boolean))
+                      ).sort() as string[];
+
+                      const usuariosFiltrados = usuariosDisponiveis
+                        .filter((u) => {
+                          const buscaOk = filtroBusca === '' || u.nome.toLowerCase().includes(filtroBusca.toLowerCase());
+                          const setorOk = filtroSetor === '' || u.setor === filtroSetor;
+                          return buscaOk && setorOk;
+                        })
+                        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+                      return (
+                        <>
+                          <div className="mx-4 my-2 border-t border-slate-100" />
+                          <div className="px-4 pb-2">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Adicionar</p>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Buscar nome..."
+                                value={filtroBusca}
+                                onChange={(e) => setFiltroBusca(e.target.value)}
+                                className="flex-1 text-[11px] px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:border-orange-300 transition-colors"
+                              />
+                              {setoresUnicos.length > 0 && (
+                                <select
+                                  value={filtroSetor}
+                                  onChange={(e) => setFiltroSetor(e.target.value)}
+                                  className="text-[11px] px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:border-orange-300 transition-colors max-w-[110px]"
+                                >
+                                  <option value="">Setor</option>
+                                  {setoresUnicos.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          </div>
+                          <div className="max-h-44 overflow-y-auto pb-2">
+                            {usuariosFiltrados.length === 0 ? (
+                              <p className="text-center text-[12px] text-slate-400 py-4">Nenhum usuário encontrado.</p>
+                            ) : (
+                              usuariosFiltrados.map((u) => (
+                                <button
+                                  key={u.id}
+                                  onClick={() => adicionarParticipante(u.id)}
+                                  disabled={adicionandoId === u.id}
+                                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-orange-50 transition-colors text-left disabled:opacity-60"
+                                >
+                                  <UserAvatar nome={u.nome} size="md" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[12px] font-semibold text-slate-700 truncate">{u.nome}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{u.setor || u.email}</p>
+                                  </div>
+                                  {adicionandoId === u.id
+                                    ? <span className="text-[10px] text-slate-400 shrink-0">Adicionando...</span>
+                                    : <span className="text-[10px] font-bold shrink-0" style={{ color: LARANJA }}>+ Convidar</span>
+                                  }
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -662,7 +682,6 @@ export default function TicketModal() {
           <p className="text-sm text-slate-600 mt-3">{selectedTicket.descricao}</p>
         </div>
 
-        {/* Área de mensagens */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 bg-slate-50">
           {carregandoMensagens
             ? <div className="text-center text-sm text-slate-400 py-8">Carregando...</div>
@@ -689,7 +708,6 @@ export default function TicketModal() {
           }
         </div>
 
-        {/* Input de envio */}
         <div className="p-4 bg-white border-t border-slate-100 rounded-b-xl relative group">
           {isFinalizado && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/10 cursor-not-allowed" title="Reabra o chamado para enviar mensagens." />

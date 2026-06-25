@@ -6,10 +6,15 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(), // Ativa o motor do Tailwind v4 no build do Vite
+    tailwindcss(),
   ],
   define: {
-    // Mapeia o objeto 'global' para o 'window' do navegador
     global: 'window',
   },
+  // --- ADICIONE ESTA PARTE ABAIXO ---
+  server: {
+    host: '0.0.0.0', // Permite que o servidor aceite conexões de outros IPs da rede
+    port: 5173,      // Porta padrão (ou a que você preferir)
+  },
+  // ----------------------------------
 })
