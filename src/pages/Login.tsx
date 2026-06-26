@@ -56,7 +56,7 @@ export const Login: React.FC = () => {
           <div className="w-16 h-16 bg-[#E95C13] rounded-full flex items-center justify-center text-white shadow-md">
             <Headset size={32} />
           </div>
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight mt-1">Portal da Tecnologia</h1>
+          <h1 className="text-xl font-bold text-gray-800 tracking-tight mt-1">Portal Tecnologia</h1>
         </div>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
