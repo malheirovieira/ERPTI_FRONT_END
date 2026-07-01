@@ -1,7 +1,10 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+// Importamos a URL centralizada do seu arquivo api.ts
+import { API_URL_CHAT } from '../services/api'; 
 
-const SOCKET_URL = 'http://localhost:8080/ws-gestao'; 
+// Constrói a URL do WebSocket usando a constante unificada
+const SOCKET_URL = `${API_URL_CHAT}/ws-gestao`; 
 
 class BatePapoService {
   private client: Client;

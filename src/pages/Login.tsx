@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Headset, Eye, EyeOff } from 'lucide-react';
 import { useTheme } from "../context/ThemeContext";
-// Importação da URL configurada centralizadamente
-import { API_URL } from '../services/api'; 
+import { API_URL_SUPORTE as API_URL } from '../services/api';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();

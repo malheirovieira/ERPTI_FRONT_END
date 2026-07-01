@@ -5,75 +5,43 @@ import { ListaConversas } from './components/ListaConversas';
 import { ChatHeader } from './components/ChatHeader';
 import { MensagensLista } from './components/MensagensLista';
 import { CaixaTexto } from './components/CaixaTexto';
-import { NovaConversaModal } from './components/NovaConversaModal';
-import { CONVERSAS_MOCK, type Conversa } from './mocks/conversasMock';
+import type { Conversa } from './mocks/conversasMock';
 import type { PessoaSelecionavel } from './mocks/pessoasMock';
 
 export const BatePapoPagina: React.FC = () => {
   const { mensagens, carregando, conectarCanal, enviarMensagem } = useBatePapo();
   const usuarioAtual = useUsuarioAtual();
 
-  const [conversas, setConversas] = useState<Conversa[]>(CONVERSAS_MOCK);
-  const [conversaAtiva, setConversaAtiva] = useState<Conversa>(CONVERSAS_MOCK[1]);
-  const [modalAberto, setModalAberto] = useState(false);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [conversaAtiva, setConversaAtiva] = useState<Conversa | null>(null);
 
   useEffect(() => {
-    conectarCanal(conversaAtiva.id);
-  }, [conversaAtiva.id, conectarCanal]);
+    if (conversaAtiva) conectarCanal(conversaAtiva.id);
+  }, [conversaAtiva?.id, conectarCanal]);
 
-  const handleEnviar = (conteudo: string) => {
-    enviarMensagem(conversaAtiva.id, conteudo);
-  };
-
-  // Fluxo unificado (inspirado no Google Chat): 1 pessoa = conversa individual, 2+ = grupo
-  const handleIniciarChat = (pessoas: PessoaSelecionavel[]) => {
-    const ehGrupo = pessoas.length > 1;
-
-    // TODO: trocar por chamada real ao back-end para criar/obter o canal
-    // (ex: POST /api/batepapo/canais) e usar o id retornado.
-    const novaConversa: Conversa = {
-      id: Date.now(),
-      nome: ehGrupo ? pessoas.map((p) => p.nome.split(' ')[0]).join(', ') : pessoas[0].nome,
-      tipo: ehGrupo ? 'grupo' : 'individual',
-      preview: 'Conversa criada agora',
-      hora: 'agora',
-      participantes: ehGrupo ? pessoas.length : undefined,
-      online: ehGrupo ? undefined : true,
-    };
-
-    setConversas((atual) => [novaConversa, ...atual]);
-    setConversaAtiva(novaConversa);
-    setModalAberto(false);
+  const handleIniciarNovoChat = (pessoas: PessoaSelecionavel[]) => {
+    console.log('Iniciando chat com:', pessoas);
+    // Aqui você chama sua API para criar a conversa
   };
 
   return (
-    <div className="flex h-full overflow-hidden bg-white">
+    <div className="flex h-full w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <ListaConversas
         conversas={conversas}
-        conversaAtivaId={conversaAtiva.id}
+        conversaAtivaId={conversaAtiva?.id ?? 0}
         onSelecionar={setConversaAtiva}
-        onNovoChat={() => setModalAberto(true)}
+        onIniciarNovoChat={handleIniciarNovoChat}
       />
 
-      <section className="flex-1 flex flex-col min-w-0">
-        <ChatHeader conversa={conversaAtiva} />
-        <MensagensLista
-          mensagens={mensagens}
-          conversa={conversaAtiva}
-          usuarioAtualId={usuarioAtual.id}
-          carregando={carregando}
-        />
-        <CaixaTexto
-          placeholder={`Enviar mensagem para ${conversaAtiva.nome}`}
-          onEnviar={handleEnviar}
-        />
-      </section>
-
-      <NovaConversaModal
-        aberto={modalAberto}
-        onFechar={() => setModalAberto(false)}
-        onIniciarChat={handleIniciarChat}
-      />
+      {conversaAtiva ? (
+        <section className="flex-1 flex flex-col min-w-0">
+          <ChatHeader conversa={conversaAtiva} />
+          <MensagensLista mensagens={mensagens} conversa={conversaAtiva} usuarioAtualId={usuarioAtual.id} carregando={carregando} />
+          <CaixaTexto placeholder={`Enviar mensagem para ${conversaAtiva.nome}`} onEnviar={(t) => enviarMensagem(conversaAtiva.id, t)} />
+        </section>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-500">Selecione uma conversa</div>
+      )}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import * as LucideIcons from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { MenuBar } from '../layouts/MenuBar';
 import { ProfileMenuModal } from '../layouts/ProfileMenuModal';
+import { useBatePapo } from '../../pages/Bate-Papo/context/BatePapoContext';
 
 // Importa a URL centralizada e a função de cabeçalhos autenticados
 import { API_URL, getAuthHeaders } from '../../services/api';
@@ -13,6 +14,7 @@ import { API_URL, getAuthHeaders } from '../../services/api';
 export const Home: React.FC = () => {
   const { empresa, corTema } = useEmpresa();
   const { theme, toggleTheme, setTheme } = useTheme();
+  const { totalNaoLidas } = useBatePapo();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -153,12 +155,13 @@ export const Home: React.FC = () => {
               const IconComponent = (LucideIcons as any)[item.icon] || LucideIcons.LayoutDashboard;
               const normalizedPath = String(item.path).startsWith('/') ? item.path : `/${item.path}`;
               const isActive = location.pathname.includes(normalizedPath);
+              const isBatePapo = item.label.toLowerCase().includes('bate');
 
               return (
                 <Link 
                   key={item.path} 
                   to={item.path} 
-                  className={`flex items-center gap-4 px-6 py-3 text-sm transition-all duration-200 border-l-4 ${
+                  className={`relative flex items-center gap-4 px-6 py-3 text-sm transition-all duration-200 border-l-4 ${
                     isActive ? 'border-[#E95C13]' : 'border-transparent hover:border-[#E95C13]'
                   } ${
                     theme === 'dark' 
@@ -167,6 +170,13 @@ export const Home: React.FC = () => {
                   }`}
                 >
                   <IconComponent size={22} className={`shrink-0 ${isActive ? 'text-[#E95C13]' : ''}`} />
+                  
+                  {isBatePapo && totalNaoLidas > 0 && (
+                    <span className="absolute left-[34px] top-2 flex items-center justify-center w-5 h-5 bg-[#E95C13] text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-[#2a2b2e] shadow-sm">
+                      {totalNaoLidas > 9 ? '9+' : totalNaoLidas}
+                    </span>
+                  )}
+
                   <span className={`font-medium whitespace-nowrap transition-all duration-700 ease-in-out ${isSidebarOpen ? 'opacity-100 max-w-[200px] translate-x-0 delay-200' : 'opacity-0 max-w-0 overflow-hidden -translate-x-4 pointer-events-none'}`}>
                     {item.label}
                   </span>
@@ -180,7 +190,10 @@ export const Home: React.FC = () => {
           </div>
         </aside>
 
-        <main className={`flex-1 p-8 overflow-y-auto transition-colors duration-700 ${theme === 'dark' ? 'bg-[#35363a]' : 'bg-[#f8f9fa]'}`} onClick={() => setIsMenuBarOpen(false)}>
+        <main 
+          className={`flex-1 ${location.pathname.includes('batepapo') ? 'p-4' : 'p-8'} overflow-y-auto transition-colors duration-700 ${theme === 'dark' ? 'bg-[#35363a]' : 'bg-[#f8f9fa]'}`} 
+          onClick={() => setIsMenuBarOpen(false)}
+        >
           <Outlet />
         </main>
       </div>

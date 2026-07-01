@@ -8,9 +8,8 @@ interface BatePapoContextData {
   mensagens: MensagemRetornoDTO[];
   canalAtivo: number | null;
   carregando: boolean;
-  /** Busca o histórico (REST) e se inscreve no tópico do canal (WebSocket) */
+  totalNaoLidas: number;
   conectarCanal: (canalId: number) => Promise<void>;
-  /** Publica uma mensagem no canal informado */
   enviarMensagem: (canalId: number, conteudo: string) => void;
 }
 
@@ -21,9 +20,8 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [mensagens, setMensagens] = useState<MensagemRetornoDTO[]>([]);
   const [canalAtivo, setCanalAtivo] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [totalNaoLidas, setTotalNaoLidas] = useState(0);
 
-  // guarda o canal ativo "de verdade" (sem esperar o re-render do state),
-  // usado para descartar respostas/mensagens de um canal que o usuário já trocou
   const canalAtivoRef = useRef<number | null>(null);
 
   const conectarCanal = useCallback(async (canalId: number) => {
@@ -31,11 +29,11 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCanalAtivo(canalId);
     setCarregando(true);
     setMensagens([]);
+    setTotalNaoLidas(0);
 
     try {
-      // 1) histórico salvo (REST)
       const historico = await buscarHistoricoCanal(canalId);
-      if (canalAtivoRef.current !== canalId) return; // usuário já trocou de canal enquanto buscava
+      if (canalAtivoRef.current !== canalId) return;
       setMensagens(historico);
     } catch (erro) {
       console.error('Erro ao buscar histórico do canal:', erro);
@@ -43,12 +41,21 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (canalAtivoRef.current === canalId) setCarregando(false);
     }
 
-    // 2) tempo real (WebSocket) — inscreverNoCanal já cancela a inscrição anterior
     inscreverNoCanal(canalId, (novaMensagem) => {
+      // CORREÇÃO: Acessando 'remetente.id' ou 'remetente' dependendo da sua estrutura
+      // Se 'remetente' for o objeto que contém o ID:
+      const remetenteIdDaMensagem = typeof novaMensagem.remetente === 'object' 
+        ? (novaMensagem.remetente as any).id 
+        : novaMensagem.remetente;
+
+      if (canalAtivoRef.current !== canalId && remetenteIdDaMensagem !== usuarioAtual.id) {
+        setTotalNaoLidas((prev) => prev + 1);
+      }
+
       if (canalAtivoRef.current !== canalId) return;
       setMensagens((atual) => [...atual, novaMensagem]);
     });
-  }, []);
+  }, [usuarioAtual.id]);
 
   const enviarMensagem = useCallback(
     (canalId: number, conteudo: string) => {
@@ -58,14 +65,12 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         conteudo,
       };
       enviarMensagemWS(payload);
-      // a própria mensagem enviada volta pelo /topic/canal/{canalId} e é adicionada
-      // pelo listener acima — por isso NÃO a inserimos manualmente aqui (evita duplicar).
     },
     [usuarioAtual.id]
   );
 
   return (
-    <BatePapoContext.Provider value={{ mensagens, canalAtivo, carregando, conectarCanal, enviarMensagem }}>
+    <BatePapoContext.Provider value={{ mensagens, canalAtivo, carregando, totalNaoLidas, conectarCanal, enviarMensagem }}>
       {children}
     </BatePapoContext.Provider>
   );

@@ -1,7 +1,13 @@
 // src/config/api.ts
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:7000';
+// Configuração das URLs de cada serviço
+export const API_URL_SUPORTE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:7000';
+export const API_URL_CHAT = 'http://localhost:8080'; // URL do backend do chat
 
+/**
+ * Função unificada para gerar headers de autenticação.
+ * @param isFormData Define se o Content-Type deve ser omitido (para uploads)
+ */
 export function getAuthHeaders(isFormData: boolean = false): HeadersInit {
   const token = localStorage.getItem('token');
   
@@ -9,7 +15,6 @@ export function getAuthHeaders(isFormData: boolean = false): HeadersInit {
     'Authorization': `Bearer ${token}`
   };
 
-  // Se for FormData, omitimos o Content-Type para o navegador injetar o boundary correto
   if (!isFormData) {
     headers['Content-Type'] = 'application/json';
   }
@@ -17,22 +22,48 @@ export function getAuthHeaders(isFormData: boolean = false): HeadersInit {
   return headers;
 }
 
-export async function uploadAnexoChamado(chamadoId: number, arquivo: File) {
-  const formData = new FormData();
+/**
+ * Função auxiliar genérica para realizar chamadas Fetch.
+ * Centraliza o tratamento de erros e a injeção de headers.
+ */
+export async function apiRequest(url: string, options: RequestInit = {}) {
+  const config: RequestInit = {
+    ...options,
+    headers: {
+      ...getAuthHeaders(options.body instanceof FormData),
+      ...options.headers,
+    },
+  };
+
+  const response = await fetch(url, config);
   
-  // O backend exige exatamente a key 'arquivo' para mapear o arquivo
-  formData.append('arquivo', arquivo);
-
-  const response = await fetch(`${API_URL}/chamados/${chamadoId}/mensagens`, {
-    method: 'POST',
-    headers: getAuthHeaders(true), // Passa true para não enviar o Content-Type padrão
-    body: formData,
-  });
-
   if (!response.ok) {
-    const textoErro = await response.text();
-    throw new Error(textoErro || 'Ocorreu um erro ao enviar o anexo.');
+    const errorText = await response.text();
+    throw new Error(errorText || 'Ocorreu um erro na requisição.');
   }
 
   return response.json();
 }
+
+// --- Funções Específicas do Suporte (Legado/Manutenção) ---
+
+export async function uploadAnexoChamado(chamadoId: number, arquivo: File) {
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+
+  return await apiRequest(`${API_URL_SUPORTE}/chamados/${chamadoId}/mensagens`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+// --- Funções do Chat ---
+
+export async function fetchUsuariosChat() {
+  // Chamada para a rota /usuarios/get que você definiu
+  return await apiRequest(`${API_URL_CHAT}/usuarios/get`, {
+    method: 'GET'
+  });
+}
+
+export const API_URL = API_URL_SUPORTE;
