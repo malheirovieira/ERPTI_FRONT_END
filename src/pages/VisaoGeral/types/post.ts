@@ -1,3 +1,4 @@
+// src/pages/VisaoGeral/types/post.ts
 
 export interface AvisoResponse {
   id: number;
@@ -20,17 +21,18 @@ export interface AvisoResponse {
   euCurti?: boolean;
   euFavoritei?: boolean;
 }
- 
+
 export interface ComentarioResponse {
   id: number;
   idUsuario: number;
   nomeUsuario: string;
   fotoUsuario?: string | null;
   conteudo: string;
+  idPai?: number | null;   // null/undefined = comentário raiz; number = resposta
   criadoEm: string;
   editadoEm?: string | null;
 }
- 
+
 export interface CriarAvisoPayload {
   titulo?: string;
   conteudo: string;
@@ -39,4 +41,3 @@ export interface CriarAvisoPayload {
   empresaAlvo?: string;
   dataExpiracao?: string | null;
 }
- 

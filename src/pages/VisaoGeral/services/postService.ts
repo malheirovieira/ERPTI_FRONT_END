@@ -1,30 +1,22 @@
+// src/pages/VisaoGeral/services/postService.ts
+
+import { API_URL, getAuthHeaders } from '../../../services/api';
 import type { AvisoResponse, ComentarioResponse, CriarAvisoPayload } from '../types/post';
 
-// Importa o store fora do React para pegar o token
-// Se já existir outro helper de token no projeto, substitua esta importação
-import { useAuthStore } from '../../TI/SuporteTecnico/store/useAuthStore';
-
-const BASE = 'http://localhost:7000';
-
-function getToken(): string {
-  // O type assertion resolve o erro "Property 'token' does not exist" 
-  // informando ao TypeScript que a propriedade está lá em tempo de execução
-  const state = useAuthStore.getState() as { token?: string };
-  return state.token ?? '';
-}
-
-function headers() {
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` };
-}
-
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method,
-    headers: headers(),
+    headers: getAuthHeaders(),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`Erro ${res.status}: ${await res.text()}`);
-  return res.json();
+
+  if (!res.ok) {
+    const texto = await res.text();
+    throw new Error(`Erro ${res.status}: ${texto}`);
+  }
+
+  const texto = await res.text();
+  return texto ? JSON.parse(texto) : (undefined as T);
 }
 
 export const postService = {
@@ -38,7 +30,7 @@ export const postService = {
     req<AvisoResponse>('PUT', `/avisos/${id}`, payload),
 
   excluirAviso: (id: number) =>
-    req<string>('DELETE', `/avisos/${id}`),
+    req<void>('DELETE', `/avisos/${id}`),
 
   toggleFixar: (id: number) =>
     req<{ fixado: boolean }>('PATCH', `/avisos/${id}/fixar`),
@@ -54,40 +46,39 @@ export const postService = {
   listarComentarios: (id: number) =>
     req<ComentarioResponse[]>('GET', `/avisos/${id}/comentarios`),
 
-  criarComentario: (id: number, conteudo: string) =>
-    req<ComentarioResponse>('POST', `/avisos/${id}/comentarios`, { conteudo }),
+  // idPai opcional: se informado, cria uma resposta ao comentário pai
+  criarComentario: (idAviso: number, conteudo: string, idPai?: number) =>
+    req<ComentarioResponse>('POST', `/avisos/${idAviso}/comentarios`, {
+      conteudo,
+      idPai: idPai ?? null,
+    }),
 
   excluirComentario: (idAviso: number, idComentario: number) =>
-    req<string>('DELETE', `/avisos/${idAviso}/comentarios/${idComentario}`),
+    req<void>('DELETE', `/avisos/${idAviso}/comentarios/${idComentario}`),
 
-  // ── Uploads (Necessários para o ModalPost no VisaoGeral.tsx) ─────────────
+  // ── Uploads ──────────────────────────────────────────────────────────────
   uploadImagem: async (file: File): Promise<string> => {
     const formData = new FormData();
-    formData.append('file', file);
-    
-    const res = await fetch(`${BASE}/avisos/upload/imagem`, {
+    formData.append('arquivo', file);
+    const res = await fetch(`${API_URL}/avisos/upload`, {
       method: 'POST',
-      // Não enviamos 'Content-Type' manualmente com FormData, o navegador define o boundary automaticamente
-      headers: { Authorization: `Bearer ${getToken()}` },
-      body: formData
+      headers: getAuthHeaders(true),
+      body: formData,
     });
-    
     if (!res.ok) throw new Error(`Erro no upload de imagem: ${await res.text()}`);
     const data = await res.json();
-    return data.url; 
+    return data.url;
   },
 
   uploadAnexo: async (file: File): Promise<{ url: string; nomeOriginal: string }> => {
     const formData = new FormData();
-    formData.append('file', file);
-    
-    const res = await fetch(`${BASE}/avisos/upload/anexo`, {
+    formData.append('arquivo', file);
+    const res = await fetch(`${API_URL}/avisos/upload-anexo`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
-      body: formData
+      headers: getAuthHeaders(true),
+      body: formData,
     });
-    
     if (!res.ok) throw new Error(`Erro no upload de anexo: ${await res.text()}`);
-    return res.json(); 
-  }
+    return res.json();
+  },
 };

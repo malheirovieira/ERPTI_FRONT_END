@@ -1,9 +1,11 @@
+// src/pages/VisaoGeral/VisaoGeral.tsx
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuthStore } from '../TI/SuporteTecnico/store/useAuthStore';
 import { postService } from './services/postService';
 import type { AvisoResponse, ComentarioResponse } from './types/post';
 
-// ─── Ícones SVG inline (sem dependência extra) ───────────────────────────────
+// ─── Ícones SVG inline ────────────────────────────────────────────────────────
 const IconHeart = ({ filled }: { filled?: boolean }) => (
   <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -50,8 +52,13 @@ const IconClose = () => (
   </svg>
 );
 const IconDotsH = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path d="M5 12a1 1 0 110-2 1 1 0 010 2zm7 0a1 1 0 110-2 1 1 0 010 2zm7 0a1 1 0 110-2 1 1 0 010 2z"/>
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+    <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+  </svg>
+);
+const IconReply = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
   </svg>
 );
 
@@ -67,20 +74,58 @@ interface PostLocal extends AvisoResponse {
   nomeAnexo?: string;
 }
 
-// ─── Avatar Helper ────────────────────────────────────────────────────────────
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ foto, nome, size = 'md' }: { foto?: string | null; nome: string; size?: 'sm' | 'md' | 'lg' }) {
   const sizes = { sm: 'w-7 h-7 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' };
   const initials = nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  if (foto) return <img src={foto} alt={nome} className={`${sizes[size]} rounded-full object-cover flex-shrink-0 ring-2 ring-white`} />;
+  if (foto) {
+    return (
+      <img
+        src={foto}
+        alt={nome}
+        loading="lazy"
+        decoding="async"
+        className={`${sizes[size]} rounded-full object-cover flex-shrink-0 ring-2 ring-white`}
+      />
+    );
+  }
   return (
-    <div className={`${sizes[size]} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ring-2 ring-white`}
-      style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
+    <div
+      className={`${sizes[size]} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ring-2 ring-white`}
+      style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}
+    >
       {initials}
     </div>
   );
 }
 
-// ─── Formata data relativa ────────────────────────────────────────────────────
+// ─── Imagem com carregamento lazy + skeleton ──────────────────────────────────
+function LazyImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (error) return null;
+
+  return (
+    <div className="relative">
+      {/* Skeleton enquanto carrega */}
+      {!loaded && (
+        <div className="w-full h-48 bg-gray-100 animate-pulse rounded-xl" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        className={`${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
+      />
+    </div>
+  );
+}
+
+// ─── Formatação de data ───────────────────────────────────────────────────────
 function dataRelativa(dateStr: string): string {
   const d = new Date(dateStr);
   const diff = (Date.now() - d.getTime()) / 1000;
@@ -92,9 +137,7 @@ function dataRelativa(dateStr: string): string {
 }
 
 // ─── Modal de criação / edição ────────────────────────────────────────────────
-function ModalPost({
-  onClose, onSalvo, postEditando, usuarioFoto, usuarioNome
-}: {
+function ModalPost({ onClose, onSalvo, postEditando, usuarioFoto, usuarioNome }: {
   onClose: () => void;
   onSalvo: () => void;
   postEditando?: PostLocal | null;
@@ -122,14 +165,8 @@ function ModalPost({
 
   const uploadImagem = async (file: File) => {
     setUploadingImg(true);
-    try {
-      const url = await postService.uploadImagem(file);
-      setUrlImagem(url);
-    } catch (error) {
-      console.error(error);
-    } finally { 
-      setUploadingImg(false); 
-    }
+    try { setUrlImagem(await postService.uploadImagem(file)); }
+    finally { setUploadingImg(false); }
   };
 
   const uploadAnexo = async (file: File) => {
@@ -138,18 +175,21 @@ function ModalPost({
       const { url, nomeOriginal } = await postService.uploadAnexo(file);
       setUrlAnexo(url);
       setNomeAnexo(nomeOriginal ?? file.name);
-    } catch (error) {
-      console.error(error);
-    } finally { 
-      setUploadingAnexo(false); 
-    }
+    } finally { setUploadingAnexo(false); }
   };
 
   const salvar = async () => {
     if (!conteudo.trim()) return;
     setEnviando(true);
     try {
-      const payload = { titulo: titulo || conteudo.slice(0, 60), conteudo, urlImagem, urlAnexo, empresaAlvo, dataExpiracao: null };
+      const payload = {
+        titulo: titulo || conteudo.slice(0, 60),
+        conteudo,
+        urlImagem: urlImagem || undefined,
+        urlAnexo: urlAnexo || undefined,
+        empresaAlvo,
+        dataExpiracao: null,
+      };
       if (postEditando) {
         await postService.editarAviso(postEditando.id, payload);
       } else {
@@ -161,45 +201,35 @@ function ModalPost({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-900 text-base">{postEditando ? 'Editar post' : 'Criar post'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"><IconClose /></button>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+            <IconClose />
+          </button>
         </div>
 
-        {/* Body */}
         <div className="p-5 flex gap-3">
           <Avatar foto={usuarioFoto} nome={usuarioNome} />
           <div className="flex-1 min-w-0">
-            {/* Título opcional */}
-            <input
-              value={titulo}
-              onChange={e => setTitulo(e.target.value)}
+            <input value={titulo} onChange={e => setTitulo(e.target.value)}
               placeholder="Título (opcional)"
-              className="w-full text-sm font-semibold text-gray-700 placeholder-gray-400 border-0 outline-none mb-2 bg-transparent"
-            />
-            {/* Conteúdo */}
-            <textarea
-              ref={textareaRef}
-              value={conteudo}
-              onChange={autoResize}
-              placeholder="O que está acontecendo?"
-              rows={4}
+              className="w-full text-sm font-semibold text-gray-700 placeholder-gray-400 border-0 outline-none mb-2 bg-transparent" />
+            <textarea ref={textareaRef} value={conteudo} onChange={autoResize}
+              placeholder="O que está acontecendo?" rows={4}
               className="w-full text-base text-gray-900 placeholder-gray-400 border-0 outline-none resize-none bg-transparent leading-relaxed"
-              style={{ minHeight: 100 }}
-            />
-
-            {/* Preview imagem */}
+              style={{ minHeight: 100 }} />
             {urlImagem && (
               <div className="relative mt-2 rounded-xl overflow-hidden">
-                <img src={urlImagem} alt="preview" className="w-full max-h-56 object-cover" />
-                <button onClick={() => setUrlImagem('')} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"><IconClose /></button>
+                <img src={urlImagem} alt="preview" loading="lazy" className="w-full max-h-56 object-cover" />
+                <button onClick={() => setUrlImagem('')}
+                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors">
+                  <IconClose />
+                </button>
               </div>
             )}
-
-            {/* Preview anexo */}
             {urlAnexo && (
               <div className="mt-2 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-sm text-orange-700">
                 <IconAttach />
@@ -210,7 +240,6 @@ function ModalPost({
           </div>
         </div>
 
-        {/* Seletor de empresa */}
         <div className="px-5 pb-3">
           <select value={empresaAlvo} onChange={e => setEmpresaAlvo(e.target.value)}
             className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 bg-gray-50 outline-none focus:border-orange-400">
@@ -220,23 +249,19 @@ function ModalPost({
           </select>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/50">
           <div className="flex items-center gap-1">
-            {/* Upload imagem */}
             <label className={`p-2 rounded-full cursor-pointer transition-colors ${uploadingImg ? 'opacity-50 cursor-wait' : 'text-orange-500 hover:bg-orange-50'}`}>
-              {uploadingImg ? <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/> : <IconPhoto />}
+              {uploadingImg ? <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> : <IconPhoto />}
               <input type="file" className="hidden" accept="image/*" disabled={uploadingImg}
                 onChange={e => e.target.files?.[0] && uploadImagem(e.target.files[0])} />
             </label>
-            {/* Upload anexo */}
             <label className={`p-2 rounded-full cursor-pointer transition-colors ${uploadingAnexo ? 'opacity-50 cursor-wait' : 'text-orange-500 hover:bg-orange-50'}`}>
-              {uploadingAnexo ? <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/> : <IconAttach />}
+              {uploadingAnexo ? <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" /> : <IconAttach />}
               <input type="file" className="hidden" disabled={uploadingAnexo}
                 onChange={e => e.target.files?.[0] && uploadAnexo(e.target.files[0])} />
             </label>
           </div>
-
           <button onClick={salvar} disabled={enviando || !conteudo.trim()}
             className="px-5 py-2 rounded-full text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: conteudo.trim() ? 'linear-gradient(135deg, #f97316, #ea580c)' : '#d1d5db' }}>
@@ -248,10 +273,123 @@ function ModalPost({
   );
 }
 
-// ─── Painel de comentários ────────────────────────────────────────────────────
-function PainelComentarios({ postId, usuarioId, usuarioFoto, usuarioNome }: {
-  postId: number; usuarioId: number; usuarioFoto?: string | null;
+// ─── Item de comentário (raiz ou resposta) ────────────────────────────────────
+function ItemComentario({
+  comentario, respostas, usuarioId, postId,
+  usuarioFoto, usuarioNome, onExcluir, onNovaCriada,
+}: {
+  comentario: ComentarioResponse;
+  respostas: ComentarioResponse[];
+  usuarioId: number;
+  postId: number;
+  usuarioFoto?: string | null;
   usuarioNome: string;
+  onExcluir: (id: number) => void;
+  onNovaCriada: (novo: ComentarioResponse) => void;
+}) {
+  const [respondendo, setRespondendo] = useState(false);
+  const [textoResposta, setTextoResposta] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const enviarResposta = async () => {
+    if (!textoResposta.trim()) return;
+    setEnviando(true);
+    try {
+      const novo = await postService.criarComentario(postId, textoResposta, comentario.id);
+      onNovaCriada(novo);
+      setTextoResposta('');
+      setRespondendo(false);
+    } finally { setEnviando(false); }
+  };
+
+  return (
+    <div className="flex gap-2 group">
+      <Avatar foto={comentario.fotoUsuario} nome={comentario.nomeUsuario} size="sm" />
+      <div className="flex-1 min-w-0">
+        {/* Balão do comentário */}
+        <div className="bg-white rounded-xl px-3 py-2 text-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="font-semibold text-gray-800 text-xs">{comentario.nomeUsuario}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-400 text-xs">{dataRelativa(comentario.criadoEm)}</span>
+              {comentario.idUsuario === usuarioId && (
+                <button onClick={() => onExcluir(comentario.id)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all">
+                  <IconTrash />
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-gray-700 leading-snug">{comentario.conteudo}</p>
+        </div>
+
+        {/* Ação: responder */}
+        <button onClick={() => setRespondendo(v => !v)}
+          className="flex items-center gap-1 mt-1 ml-1 text-xs text-gray-400 hover:text-orange-500 transition-colors">
+          <IconReply />
+          <span>Responder</span>
+        </button>
+
+        {/* Caixa de resposta */}
+        {respondendo && (
+          <div className="flex items-center gap-2 mt-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-100 transition-all">
+            <Avatar foto={usuarioFoto} nome={usuarioNome} size="sm" />
+            <input
+              autoFocus
+              value={textoResposta}
+              onChange={e => setTextoResposta(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarResposta(); } }}
+              placeholder={`Respondendo ${comentario.nomeUsuario}...`}
+              className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder-gray-400"
+            />
+            <button onClick={() => setRespondendo(false)} className="text-gray-300 hover:text-gray-500 transition-colors">
+              <IconClose />
+            </button>
+            <button onClick={enviarResposta} disabled={enviando || !textoResposta.trim()}
+              className="text-orange-500 hover:text-orange-600 disabled:opacity-40 font-semibold text-xs transition-colors">
+              {enviando ? '...' : 'Enviar'}
+            </button>
+          </div>
+        )}
+
+        {/* Respostas aninhadas (1 nível) */}
+        {respostas.length > 0 && (
+          <div className="mt-2 ml-3 space-y-2 border-l-2 border-orange-100 pl-3">
+            {respostas.map(r => (
+              <div key={r.id} className="flex gap-2 group/resposta">
+                <Avatar foto={r.fotoUsuario} nome={r.nomeUsuario} size="sm" />
+                <div className="flex-1 bg-white rounded-xl px-3 py-2 text-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-semibold text-gray-800 text-xs">{r.nomeUsuario}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-gray-400 text-xs">{dataRelativa(r.criadoEm)}</span>
+                      {r.idUsuario === usuarioId && (
+                        <button onClick={() => onExcluir(r.id)}
+                          className="opacity-0 group-hover/resposta:opacity-100 text-gray-300 hover:text-red-500 transition-all">
+                          <IconTrash />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-gray-700 leading-snug">{r.conteudo}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Painel de comentários ────────────────────────────────────────────────────
+function PainelComentarios({ postId, usuarioId, usuarioFoto, usuarioNome, onTotalChange }: {
+  postId: number;
+  usuarioId: number;
+  usuarioFoto?: string | null;
+  usuarioNome: string;
+  /** Callback chamado quando o total de comentários muda (para atualizar o contador no card) */
+  onTotalChange: (delta: number) => void;
 }) {
   const [comentarios, setComentarios] = useState<ComentarioResponse[]>([]);
   const [texto, setTexto] = useState('');
@@ -260,38 +398,51 @@ function PainelComentarios({ postId, usuarioId, usuarioFoto, usuarioNome }: {
 
   useEffect(() => {
     setLoading(true);
-    postService.listarComentarios(postId).then(setComentarios).finally(() => setLoading(false));
+    postService.listarComentarios(postId)
+      .then(setComentarios)
+      .finally(() => setLoading(false));
   }, [postId]);
 
-  const enviar = async () => {
+  // Separa raízes de respostas
+  const raizes = comentarios.filter(c => !c.idPai);
+  const respostasPor = (idPai: number) => comentarios.filter(c => c.idPai === idPai);
+
+  const adicionarComentario = (novo: ComentarioResponse) => {
+    setComentarios(prev => [...prev, novo]);
+    onTotalChange(+1);
+  };
+
+  const excluirComentario = async (idComentario: number) => {
+    // Conta quantos serão removidos (o comentário + suas respostas)
+    const qtdRemovidos = comentarios.filter(
+      c => c.id === idComentario || c.idPai === idComentario
+    ).length;
+    await postService.excluirComentario(postId, idComentario);
+    setComentarios(prev => prev.filter(c => c.id !== idComentario && c.idPai !== idComentario));
+    onTotalChange(-qtdRemovidos);
+  };
+
+  const enviarRaiz = async () => {
     if (!texto.trim()) return;
     setEnviando(true);
     try {
       const novo = await postService.criarComentario(postId, texto);
-      setComentarios(prev => [...prev, novo]);
+      adicionarComentario(novo);
       setTexto('');
     } finally { setEnviando(false); }
   };
 
-  const excluirComentario = async (idComentario: number) => {
-    await postService.excluirComentario(postId, idComentario);
-    setComentarios(prev => prev.filter(c => c.id !== idComentario));
-  };
-
   return (
     <div className="border-t border-gray-100 bg-gray-50/50">
-      {/* Caixa de novo comentário */}
+      {/* Caixa de comentário raiz */}
       <div className="flex gap-2.5 px-4 pt-3 pb-2">
         <Avatar foto={usuarioFoto} nome={usuarioNome} size="sm" />
         <div className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-100 transition-all">
-          <input
-            value={texto}
-            onChange={e => setTexto(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+          <input value={texto} onChange={e => setTexto(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarRaiz(); } }}
             placeholder="Adicionar comentário..."
-            className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder-gray-400"
-          />
-          <button onClick={enviar} disabled={enviando || !texto.trim()}
+            className="flex-1 text-sm bg-transparent outline-none text-gray-800 placeholder-gray-400" />
+          <button onClick={enviarRaiz} disabled={enviando || !texto.trim()}
             className="text-orange-500 hover:text-orange-600 disabled:opacity-40 font-semibold text-xs transition-colors">
             {enviando ? '...' : 'Enviar'}
           </button>
@@ -299,28 +450,23 @@ function PainelComentarios({ postId, usuarioId, usuarioFoto, usuarioNome }: {
       </div>
 
       {/* Lista */}
-      <div className="px-4 pb-3 space-y-2 max-h-60 overflow-y-auto">
+      <div className="px-4 pb-3 space-y-3 max-h-72 overflow-y-auto">
         {loading && <p className="text-xs text-gray-400 text-center py-2">Carregando...</p>}
-        {!loading && comentarios.length === 0 && (
+        {!loading && raizes.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-2">Seja o primeiro a comentar.</p>
         )}
-        {comentarios.map(c => (
-          <div key={c.id} className="flex gap-2 group">
-            <Avatar foto={c.fotoUsuario} nome={c.nomeUsuario} size="sm" />
-            <div className="flex-1 bg-white rounded-xl px-3 py-2 text-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="font-semibold text-gray-800 text-xs">{c.nomeUsuario}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-400 text-xs">{dataRelativa(c.criadoEm)}</span>
-                  {(c.idUsuario === usuarioId) && (
-                    <button onClick={() => excluirComentario(c.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all"><IconTrash /></button>
-                  )}
-                </div>
-              </div>
-              <p className="text-gray-700 leading-snug">{c.conteudo}</p>
-            </div>
-          </div>
+        {raizes.map(c => (
+          <ItemComentario
+            key={c.id}
+            comentario={c}
+            respostas={respostasPor(c.id)}
+            usuarioId={usuarioId}
+            postId={postId}
+            usuarioFoto={usuarioFoto}
+            usuarioNome={usuarioNome}
+            onExcluir={excluirComentario}
+            onNovaCriada={adicionarComentario}
+          />
         ))}
       </div>
     </div>
@@ -331,6 +477,7 @@ function PainelComentarios({ postId, usuarioId, usuarioFoto, usuarioNome }: {
 function PostCard({
   post, usuarioId, usuarioRole, usuarioFoto, usuarioNome,
   onExcluir, onEditar, onToggleCurtir, onToggleFavoritar, onToggleFixar,
+  onTotalComentariosChange,
 }: {
   post: PostLocal;
   usuarioId: number;
@@ -342,6 +489,8 @@ function PostCard({
   onToggleCurtir: (id: number) => void;
   onToggleFavoritar: (id: number) => void;
   onToggleFixar: (id: number) => void;
+  /** FIX: callback para propagar mudança no contador de comentários ao estado pai */
+  onTotalComentariosChange: (postId: number, delta: number) => void;
 }) {
   const [comentariosAbertos, setComentariosAbertos] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -361,7 +510,7 @@ function PostCard({
 
   return (
     <article className={`bg-white rounded-2xl border transition-shadow hover:shadow-md ${post.fixado ? 'border-orange-200 ring-1 ring-orange-100' : 'border-gray-100 shadow-sm'}`}>
-      {/* Badge fixado */}
+
       {post.fixado && (
         <div className="flex items-center gap-1.5 px-4 pt-3 text-xs font-semibold text-orange-500">
           <IconPin /><span>Post fixado</span>
@@ -382,7 +531,6 @@ function PostCard({
           </div>
         </div>
 
-        {/* Menu de ações */}
         {podeModenar && (
           <div className="relative" ref={menuRef}>
             <button onClick={() => setMenuAberto(v => !v)}
@@ -414,16 +562,16 @@ function PostCard({
 
       {/* Conteúdo */}
       <div className="px-4 pb-3">
-        {post.titulo && post.titulo !== post.conteudo.slice(0, 60) && (
+        {post.titulo && post.titulo !== post.conteudo?.slice(0, 60) && (
           <h3 className="font-bold text-gray-900 text-base mb-1">{post.titulo}</h3>
         )}
         <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">{post.conteudo}</p>
       </div>
 
-      {/* Imagem */}
+      {/* Imagem com carregamento lazy + skeleton */}
       {post.urlImagem && (
         <div className="mx-4 mb-3 rounded-xl overflow-hidden border border-gray-100">
-          <img src={post.urlImagem} alt="imagem do post" className="w-full object-cover max-h-96" />
+          <LazyImage src={post.urlImagem} alt="imagem do post" className="w-full object-cover max-h-96" />
         </div>
       )}
 
@@ -441,21 +589,19 @@ function PostCard({
 
       {/* Barra de ações */}
       <div className="flex items-center gap-1 px-3 py-2.5 border-t border-gray-100">
-        {/* Curtir */}
         <button onClick={() => onToggleCurtir(post.id)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${post.euCurti ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-gray-500 hover:bg-gray-100 hover:text-red-400'}`}>
           <IconHeart filled={post.euCurti} />
           <span>{post.totalCurtidas ?? 0}</span>
         </button>
 
-        {/* Comentar */}
         <button onClick={() => setComentariosAbertos(v => !v)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${comentariosAbertos ? 'text-blue-500 bg-blue-50' : 'text-gray-500 hover:bg-gray-100 hover:text-blue-400'}`}>
           <IconComment />
+          {/* FIX: exibe o totalComentarios que vem do estado do pai (sempre atualizado) */}
           <span>{post.totalComentarios ?? 0}</span>
         </button>
 
-        {/* Favoritar */}
         <button onClick={() => onToggleFavoritar(post.id)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ml-auto ${post.euFavoritei ? 'text-orange-500 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 hover:bg-gray-100 hover:text-orange-400'}`}>
           <IconBookmark filled={post.euFavoritei} />
@@ -469,6 +615,7 @@ function PostCard({
           usuarioId={usuarioId}
           usuarioFoto={usuarioFoto}
           usuarioNome={usuarioNome}
+          onTotalChange={(delta) => onTotalComentariosChange(post.id, delta)}
         />
       )}
     </article>
@@ -482,8 +629,6 @@ export function VisaoGeral() {
   const [filtro, setFiltro] = useState<'TODOS' | 'MEUS' | 'FAVORITOS'>('TODOS');
   const [modalAberto, setModalAberto] = useState(false);
   const [postEditando, setPostEditando] = useState<PostLocal | null>(null);
-  
-  // Token não é mais requisitado aqui
   const { usuario, fetchUsuarioLogado } = useAuthStore();
 
   const carregar = useCallback(async () => {
@@ -503,8 +648,7 @@ export function VisaoGeral() {
     if (!usuario) fetchUsuarioLogado();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Ações optimistic ──────────────────────────────────────────────────────
-
+  // FIX: remove imediatamente do estado local — sem aguardar um re-fetch
   const handleExcluir = async (id: number) => {
     if (!window.confirm('Deseja excluir este post?')) return;
     await postService.excluirAviso(id);
@@ -512,6 +656,7 @@ export function VisaoGeral() {
   };
 
   const handleToggleCurtir = async (id: number) => {
+    // Optimistic update
     setPosts(prev => prev.map(p => p.id === id
       ? { ...p, euCurti: !p.euCurti, totalCurtidas: (p.totalCurtidas ?? 0) + (p.euCurti ? -1 : 1) }
       : p
@@ -524,9 +669,8 @@ export function VisaoGeral() {
 
   const handleToggleFavoritar = async (id: number) => {
     setPosts(prev => prev.map(p => p.id === id ? { ...p, euFavoritei: !p.euFavoritei } : p));
-    try {
-      await postService.toggleFavoritar(id);
-    } catch { carregar(); }
+    try { await postService.toggleFavoritar(id); }
+    catch { carregar(); }
   };
 
   const handleToggleFixar = async (id: number) => {
@@ -534,53 +678,55 @@ export function VisaoGeral() {
     carregar();
   };
 
-  const handleEditar = (post: PostLocal) => {
-    setPostEditando(post);
-    setModalAberto(true);
-  };
+  // FIX: atualiza o contador de comentários no estado pai quando PainelComentarios avisa
+  const handleTotalComentariosChange = useCallback((postId: number, delta: number) => {
+    setPosts(prev => prev.map(p =>
+      p.id === postId
+        ? { ...p, totalComentarios: Math.max(0, (p.totalComentarios ?? 0) + delta) }
+        : p
+    ));
+  }, []);
 
-  const fecharModal = () => {
-    setModalAberto(false);
-    setPostEditando(null);
-  };
+  const fecharModal = () => { setModalAberto(false); setPostEditando(null); };
 
-  // ── Filtragem ─────────────────────────────────────────────────────────────
   const postsFiltrados = posts.filter(p => {
     if (filtro === 'MEUS') return p.idCriador === usuario?.id;
     if (filtro === 'FAVORITOS') return p.euFavoritei;
     return true;
   });
 
+  const usuarioFoto: string | null = null;
+  const usuarioNome = usuario?.nome ?? '';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
+        {/* Cabeçalho */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">Feed</h1>
             <p className="text-sm text-gray-500 mt-0.5">{posts.length} publicações</p>
           </div>
-          <button
-            onClick={() => { setPostEditando(null); setModalAberto(true); }}
+          <button onClick={() => { setPostEditando(null); setModalAberto(true); }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md hover:shadow-lg transition-all active:scale-95"
             style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)' }}>
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
             Criar post
           </button>
         </div>
 
-        {/* ── Caixa rápida de post (estilo Twitter) ──────────────────────── */}
+        {/* Caixa rápida */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 mb-5 flex items-center gap-3 cursor-pointer hover:border-orange-200 transition-colors"
           onClick={() => { setPostEditando(null); setModalAberto(true); }}>
-          <Avatar foto={undefined} nome={usuario?.nome ?? 'U'} />
+          <Avatar foto={usuarioFoto} nome={usuarioNome || 'U'} />
           <span className="text-gray-400 text-sm flex-1">O que está acontecendo?</span>
-          <div className="flex items-center gap-2 text-orange-400">
-            <IconPhoto /><IconAttach />
-          </div>
+          <div className="flex items-center gap-2 text-orange-400"><IconPhoto /><IconAttach /></div>
         </div>
 
-        {/* ── Filtros ─────────────────────────────────────────────────────── */}
+        {/* Filtros */}
         <div className="flex items-center gap-2 mb-5 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm">
           {(['TODOS', 'MEUS', 'FAVORITOS'] as const).map(f => (
             <button key={f} onClick={() => setFiltro(f)}
@@ -591,7 +737,7 @@ export function VisaoGeral() {
           ))}
         </div>
 
-        {/* ── Feed ────────────────────────────────────────────────────────── */}
+        {/* Feed */}
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
@@ -616,9 +762,7 @@ export function VisaoGeral() {
             <p className="text-gray-500 font-medium">
               {filtro === 'FAVORITOS' ? 'Nenhum post salvo ainda.' : 'Nenhum post encontrado.'}
             </p>
-            <p className="text-gray-400 text-sm mt-1">
-              {filtro === 'TODOS' ? 'Seja o primeiro a publicar algo!' : ''}
-            </p>
+            {filtro === 'TODOS' && <p className="text-gray-400 text-sm mt-1">Seja o primeiro a publicar algo!</p>}
           </div>
         ) : (
           <div className="space-y-4">
@@ -628,27 +772,27 @@ export function VisaoGeral() {
                 post={post}
                 usuarioId={usuario?.id ?? 0}
                 usuarioRole={usuario?.role ?? 'USER'}
-                usuarioFoto={undefined}
-                usuarioNome={usuario?.nome ?? ''}
+                usuarioFoto={usuarioFoto}
+                usuarioNome={usuarioNome}
                 onExcluir={handleExcluir}
-                onEditar={handleEditar}
+                onEditar={(p) => { setPostEditando(p); setModalAberto(true); }}
                 onToggleCurtir={handleToggleCurtir}
                 onToggleFavoritar={handleToggleFavoritar}
                 onToggleFixar={handleToggleFixar}
+                onTotalComentariosChange={handleTotalComentariosChange}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* ── Modal ────────────────────────────────────────────────────────── */}
       {modalAberto && (
         <ModalPost
           onClose={fecharModal}
           onSalvo={carregar}
           postEditando={postEditando}
-          usuarioFoto={undefined}
-          usuarioNome={usuario?.nome ?? ''}
+          usuarioFoto={usuarioFoto}
+          usuarioNome={usuarioNome}
         />
       )}
     </div>
