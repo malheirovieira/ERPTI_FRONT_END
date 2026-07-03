@@ -30,22 +30,26 @@ export const BatePapoPagina: React.FC = () => {
   useEffect(() => {
     if (!usuario?.id) return;
 
-    console.log(`Chat integrado! Logado como: ${usuario.nome} (ID: ${usuario.id})`);
-
     fetchCanaisUsuario(usuario.id)
       .then((canais: any[]) => {
         if (!canais) return;
-        const listaMapeada: Conversa[] = canais.map((canal) => ({
-          id: canal.id,
-          nome: canal.nome,
-          tipo: canal.tipo.toLowerCase() === 'privado' ? 'individual' : 'grupo',
-          preview: 'Clique para abrir',
-          hora: 'Ativo',
-          naoLidas: 0
-        }));
+        
+        const listaMapeada: Conversa[] = canais.map((canal) => {
+          // A MÁGICA: O backend envia os participantes, pegamos o que NÃO é o usuário logado
+          const interlocutor = canal.participantes?.find((p: any) => Number(p.id) !== Number(usuario.id));
+          
+          return {
+            id: canal.id,
+            nome: interlocutor ? interlocutor.nome : canal.nome,
+            tipo: canal.tipo.toLowerCase() === 'privado' ? 'individual' : 'grupo',
+            preview: 'Clique para abrir',
+            hora: 'Ativo',
+            naoLidas: 0
+          };
+        });
         setConversas(listaMapeada);
       })
-      .catch((err) => console.error('Erro ao buscar histórico de conversas no PostgreSQL:', err));
+      .catch((err) => console.error('Erro ao buscar conversas:', err));
   }, [usuario?.id]);
 
   useEffect(() => {

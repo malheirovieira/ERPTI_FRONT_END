@@ -11,13 +11,14 @@ export interface Conversa {
   naoLidas?: number;
   online?: boolean;
   participantes?: number;
+  outroUsuarioId?: number; // NOVO: id do outro usuário, só p/ tipo 'individual' — necessário p/ presença em tempo real
 }
 
 export const CONVERSAS_MOCK: Conversa[] = [
   { id: 99, nome: 'Chat Global — Engebag', tipo: 'global', preview: 'Canal aberto para toda a empresa', hora: 'agora', participantes: 312 },
-  { id: 1, nome: 'Mariana Souza', tipo: 'individual', preview: 'Beleza, já chamo o suporte então', hora: '09:42', naoLidas: 2, online: true },
-  { id: 2, nome: 'Carlos Eduardo', tipo: 'individual', preview: 'Valeu, era isso mesmo!', hora: '08:15', online: true },
-  { id: 3, nome: 'Fernanda Lima', tipo: 'individual', preview: 'Te mando o print em instantes', hora: 'Ontem', online: false },
+  { id: 1, nome: 'Mariana Souza', tipo: 'individual', preview: 'Beleza, já chamo o suporte então', hora: '09:42', naoLidas: 2, online: true, outroUsuarioId: 1 },
+  { id: 2, nome: 'Carlos Eduardo', tipo: 'individual', preview: 'Valeu, era isso mesmo!', hora: '08:15', online: true, outroUsuarioId: 2 },
+  { id: 3, nome: 'Fernanda Lima', tipo: 'individual', preview: 'Te mando o print em instantes', hora: 'Ontem', online: false, outroUsuarioId: 3 },
   { id: 10, nome: 'Equipe TI', tipo: 'grupo', preview: 'João: Subi a correção em produção', hora: '10:05', naoLidas: 5, participantes: 4 },
   { id: 11, nome: 'Suporte Técnico — Filial Centro', tipo: 'grupo', preview: 'Você: Resolvido, pode fechar', hora: 'Ontem', participantes: 3 },
 ];

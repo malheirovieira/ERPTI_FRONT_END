@@ -18,3 +18,17 @@ export interface EnviarMensagemPayload {
   remetenteId: number;
   conteudo: string;
 }
+
+// ===== NOVO: Fase 1 - tempo real avançado =====
+
+export interface PresencaEvento {
+  usuarioId: number;
+  online: boolean;
+}
+
+export interface DigitandoEvento {
+  canalId: number;
+  usuarioId: number;
+  usuarioNome: string;
+  digitando: boolean;
+}

@@ -12,6 +12,26 @@ export const ENDPOINTS = {
   /** Tópico STOMP para se inscrever e receber mensagens em tempo real de um canal */
   wsTopicoCanal: (canalId: number) => `/topic/canal/${canalId}`,
 
+  // ===== NOVO: Fase 1 - tempo real avançado =====
+
+  /** Tópico STOMP global de presença (online/offline) */
+  wsTopicoPresenca: '/topic/presenca',
+
+  /** Tópico STOMP de "digitando..." por canal */
+  wsTopicoDigitando: (canalId: number) => `/topic/canal/${canalId}/digitando`,
+
+  /** Destino STOMP para avisar que está digitando */
+  wsEnviarDigitando: '/app/batepapo/digitando',
+
+  /** Destino STOMP para avisar que abriu uma conversa (marca como lida no back) */
+  wsAbrirCanal: '/app/batepapo/abrirCanal',
+
+  /** Destino STOMP para avisar que fechou/saiu da conversa ativa */
+  wsFecharCanal: '/app/batepapo/fecharCanal',
+
   /** Rota REST para buscar o histórico salvo de um canal */
   historicoCanal: (canalId: number) => `${API_BASE_URL}/api/batepapo/historico/${canalId}`,
+
+  /** Rota REST que retorna a contagem de não lidas por canal para um usuário */
+  naoLidasPorUsuario: (usuarioId: number) => `${API_BASE_URL}/api/batepapo/nao-lidas/${usuarioId}`,
 };

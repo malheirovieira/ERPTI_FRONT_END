@@ -1,18 +1,77 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface Props {
   placeholder: string;
   onEnviar: (texto: string) => void;
+  onDigitando?: (digitando: boolean) => void;
 }
 
-export const CaixaTexto: React.FC<Props> = ({ placeholder, onEnviar }) => {
+export const CaixaTexto: React.FC<Props> = ({ placeholder, onEnviar, onDigitando }) => {
   const [texto, setTexto] = useState('');
+  const ultimoEstadoDigitandoRef = useRef(false);
+  const timeoutDigitandoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Limpa o timeout se o componente for desmontado para evitar vazamentos de memória
+  useEffect(() => {
+    return () => {
+      if (timeoutDigitandoRef.current) {
+        clearTimeout(timeoutDigitandoRef.current);
+      }
+    };
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value;
+    setTexto(valor);
+
+    if (!onDigitando) return;
+
+    const temTexto = valor.trim().length > 0;
+
+    if (temTexto) {
+      // Se não estava digitando antes, dispara imediatamente o estado true
+      if (!ultimoEstadoDigitandoRef.current) {
+        ultimoEstadoDigitandoRef.current = true;
+        onDigitando(true);
+      }
+
+      // Limpa o timeout anterior e renova o debounce de 2 segundos
+      if (timeoutDigitandoRef.current) {
+        clearTimeout(timeoutDigitandoRef.current);
+      }
+
+      timeoutDigitandoRef.current = setTimeout(() => {
+        ultimoEstadoDigitandoRef.current = false;
+        onDigitando(false);
+      }, 2000);
+    } else {
+      // Se o usuário apagou todo o texto, cancela o timer e avisa imediatamente
+      if (timeoutDigitandoRef.current) {
+        clearTimeout(timeoutDigitandoRef.current);
+      }
+      if (ultimoEstadoDigitandoRef.current) {
+        ultimoEstadoDigitandoRef.current = false;
+        onDigitando(false);
+      }
+    }
+  };
 
   const handleEnviar = () => {
     const conteudo = texto.trim();
     if (!conteudo) return;
+    
     onEnviar(conteudo);
     setTexto('');
+
+    // Cancela o timeout ativo ao enviar a mensagem para não disparar após o envio
+    if (timeoutDigitandoRef.current) {
+      clearTimeout(timeoutDigitandoRef.current);
+    }
+    
+    if (ultimoEstadoDigitandoRef.current) {
+      ultimoEstadoDigitandoRef.current = false;
+      onDigitando?.(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -27,7 +86,7 @@ export const CaixaTexto: React.FC<Props> = ({ placeholder, onEnviar }) => {
       <div className="border border-[#dee2e6] rounded-2xl shadow-sm overflow-hidden">
         <input
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="w-full px-4 pt-3 pb-1 text-sm outline-none text-gray-700"

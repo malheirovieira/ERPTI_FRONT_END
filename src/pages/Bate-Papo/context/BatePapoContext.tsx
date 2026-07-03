@@ -1,7 +1,20 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
-import type { MensagemRetornoDTO, EnviarMensagemPayload } from '../types/batePapo.types';
-import { buscarHistoricoCanal } from '../services/batePapoApi';
-import { inscreverNoCanal, enviarMensagemWS } from '../services/websocketClient';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type {
+  MensagemRetornoDTO,
+  EnviarMensagemPayload,
+  PresencaEvento,
+  DigitandoEvento,
+} from '../types/batePapo.types';
+import { buscarHistoricoCanal, buscarNaoLidasPorUsuario } from '../services/batePapoApi';
+import {
+  inscreverNoCanal,
+  enviarMensagemWS,
+  inscreverPresenca,
+  inscreverDigitando,
+  enviarDigitando,
+  avisarCanalAberto,
+  avisarCanalFechado,
+} from '../services/websocketClient';
 import { useUsuarioAtual } from '../hooks/useUsuarioAtual';
 
 interface BatePapoContextData {
@@ -9,8 +22,13 @@ interface BatePapoContextData {
   canalAtivo: number | null;
   carregando: boolean;
   totalNaoLidas: number;
+  usuariosOnline: Set<number>;
+  digitandoPorCanal: Record<number, string | null>;
+  naoLidasPorCanal: Record<number, number>;
   conectarCanal: (canalId: number) => Promise<void>;
+  sairDaConversa: () => void;
   enviarMensagem: (canalId: number, conteudo: string) => void;
+  notificarDigitando: (canalId: number, digitando: boolean) => void;
 }
 
 const BatePapoContext = createContext<BatePapoContextData | undefined>(undefined);
@@ -20,41 +38,90 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [mensagens, setMensagens] = useState<MensagemRetornoDTO[]>([]);
   const [canalAtivo, setCanalAtivo] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const [totalNaoLidas, setTotalNaoLidas] = useState(0);
+
+  const [usuariosOnline, setUsuariosOnline] = useState<Set<number>>(new Set());
+  const [digitandoPorCanal, setDigitandoPorCanal] = useState<Record<number, string | null>>({});
+  const [naoLidasPorCanal, setNaoLidasPorCanal] = useState<Record<number, number>>({});
 
   const canalAtivoRef = useRef<number | null>(null);
+  const timeoutDigitandoRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
-  const conectarCanal = useCallback(async (canalId: number) => {
-    canalAtivoRef.current = canalId;
-    setCanalAtivo(canalId);
-    setCarregando(true);
-    setMensagens([]);
-    setTotalNaoLidas(0);
+  const totalNaoLidas = Object.values(naoLidasPorCanal).reduce((soma, qtd) => soma + qtd, 0);
 
-    try {
-      const historico = await buscarHistoricoCanal(canalId);
-      if (canalAtivoRef.current !== canalId) return;
-      setMensagens(historico);
-    } catch (erro) {
-      console.error('Erro ao buscar histórico do canal:', erro);
-    } finally {
-      if (canalAtivoRef.current === canalId) setCarregando(false);
-    }
+  // Presença: inscreve uma única vez, na montagem do provider
+  useEffect(() => {
+    const assinatura = inscreverPresenca((evento: PresencaEvento) => {
+      setUsuariosOnline((prev) => {
+        const novo = new Set(prev);
+        if (evento.online) novo.add(evento.usuarioId);
+        else novo.delete(evento.usuarioId);
+        return novo;
+      });
+    });
+    return () => assinatura.unsubscribe();
+  }, []);
 
-    inscreverNoCanal(canalId, (novaMensagem) => {
-      // CORREÇÃO: Acessando 'remetente.id' ou 'remetente' dependendo da sua estrutura
-      // Se 'remetente' for o objeto que contém o ID:
-      const remetenteIdDaMensagem = typeof novaMensagem.remetente === 'object' 
-        ? (novaMensagem.remetente as any).id 
-        : novaMensagem.remetente;
+  // Badge de não lidas: busca a contagem real do back ao carregar
+  useEffect(() => {
+    if (!usuarioAtual.id) return;
+    buscarNaoLidasPorUsuario(usuarioAtual.id)
+      .then(setNaoLidasPorCanal)
+      .catch((erro) => console.error('Erro ao buscar não lidas:', erro));
+  }, [usuarioAtual.id]);
 
-      if (canalAtivoRef.current !== canalId && remetenteIdDaMensagem !== usuarioAtual.id) {
-        setTotalNaoLidas((prev) => prev + 1);
+  const conectarCanal = useCallback(
+    async (canalId: number) => {
+      // Avisa o backend que saiu da conversa anterior (se havia uma)
+      if (canalAtivoRef.current !== null) {
+        avisarCanalFechado(usuarioAtual.id);
       }
 
-      if (canalAtivoRef.current !== canalId) return;
-      setMensagens((atual) => [...atual, novaMensagem]);
-    });
+      canalAtivoRef.current = canalId;
+      setCanalAtivo(canalId);
+      setCarregando(true);
+      setMensagens([]);
+      setNaoLidasPorCanal((prev) => ({ ...prev, [canalId]: 0 })); // zera o badge otimisticamente
+
+      try {
+        const historico = await buscarHistoricoCanal(canalId);
+        if (canalAtivoRef.current !== canalId) return;
+        setMensagens(historico);
+      } catch (erro) {
+        console.error('Erro ao buscar histórico do canal:', erro);
+      } finally {
+        if (canalAtivoRef.current === canalId) setCarregando(false);
+      }
+
+      inscreverNoCanal(canalId, (novaMensagem) => {
+        // Mensagem só entra no estado por AQUI — nunca localmente no envio.
+        // Isso vale também para o próprio remetente: ele está inscrito no
+        // mesmo canal, então a mensagem que ele mandou volta por este mesmo
+        // caminho e aparece na tela dele em tempo real, sem duplicar.
+        if (canalAtivoRef.current !== canalId) return;
+        setMensagens((atual) => [...atual, novaMensagem]);
+      });
+
+      inscreverDigitando(canalId, (evento: DigitandoEvento) => {
+        if (evento.usuarioId === usuarioAtual.id) return; // ignora o próprio "digitando"
+        setDigitandoPorCanal((prev) => ({
+          ...prev,
+          [canalId]: evento.digitando ? evento.usuarioNome : null,
+        }));
+      });
+
+      // Avisa o backend que esta conversa está aberta (marca como lida do lado do servidor)
+      avisarCanalAberto(canalId, usuarioAtual.id);
+    },
+    [usuarioAtual.id]
+  );
+
+  const sairDaConversa = useCallback(() => {
+    if (canalAtivoRef.current !== null) {
+      avisarCanalFechado(usuarioAtual.id);
+    }
+    canalAtivoRef.current = null;
+    setCanalAtivo(null);
+    setMensagens([]);
   }, [usuarioAtual.id]);
 
   const enviarMensagem = useCallback(
@@ -64,13 +131,43 @@ export const BatePapoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         remetenteId: usuarioAtual.id,
         conteudo,
       };
-      enviarMensagemWS(payload);
+      enviarMensagemWS(payload); // sem setState aqui — a msg volta pelo WS e entra no estado lá em cima
     },
     [usuarioAtual.id]
   );
 
+  const notificarDigitando = useCallback(
+    (canalId: number, digitando: boolean) => {
+      enviarDigitando(canalId, usuarioAtual.id, usuarioAtual.nome, digitando);
+
+      if (digitando) {
+        clearTimeout(timeoutDigitandoRef.current[canalId]);
+        timeoutDigitandoRef.current[canalId] = setTimeout(() => {
+          enviarDigitando(canalId, usuarioAtual.id, usuarioAtual.nome, false);
+        }, 2000);
+      } else {
+        clearTimeout(timeoutDigitandoRef.current[canalId]);
+      }
+    },
+    [usuarioAtual.id, usuarioAtual.nome]
+  );
+
   return (
-    <BatePapoContext.Provider value={{ mensagens, canalAtivo, carregando, totalNaoLidas, conectarCanal, enviarMensagem }}>
+    <BatePapoContext.Provider
+      value={{
+        mensagens,
+        canalAtivo,
+        carregando,
+        totalNaoLidas,
+        usuariosOnline,
+        digitandoPorCanal,
+        naoLidasPorCanal,
+        conectarCanal,
+        sairDaConversa,
+        enviarMensagem,
+        notificarDigitando,
+      }}
+    >
       {children}
     </BatePapoContext.Provider>
   );

@@ -1,43 +1,36 @@
 import React, { useEffect, useRef } from 'react';
-import type { MensagemRetornoDTO } from '../types/batePapo.types';
 import { MensagemItem } from './MensagemItem';
-import type { Conversa } from '../mocks/conversasMock';
 
-interface Props {
-  mensagens: MensagemRetornoDTO[];
-  conversa: Conversa;
-  usuarioAtualId: number;
-  carregando: boolean;
-}
-
-export const MensagensLista: React.FC<Props> = ({ mensagens, conversa, usuarioAtualId, carregando }) => {
+export const MensagensLista: React.FC<any> = ({ mensagens, conversa, usuarioAtualId, carregando }) => {
   const fimRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensagens]);
 
+  // LOG DE DEBUG PARA VOCÊ VER O QUE ESTÁ RENDERIZANDO
+  console.log("Total de mensagens no estado:", mensagens?.length);
+
+  if (carregando) return <p className="text-center p-4">Carregando...</p>;
+
   return (
     <div className="flex-1 overflow-y-auto px-6 py-4">
-      {conversa.tipo === 'global' && (
-        <div className="bg-orange-50 text-[#E95C13] text-[12.5px] font-medium px-3.5 py-2.5 rounded-lg mb-4">
-          Espaço visível para todos os colaboradores da empresa
-        </div>
-      )}
-
-      {carregando && <p className="text-sm text-gray-400 text-center mt-8">Carregando mensagens...</p>}
-
-      {!carregando && mensagens.length === 0 && (
-        <p className="text-sm text-gray-400 text-center mt-8">Nenhuma mensagem ainda. Diga oi 👋</p>
-      )}
-
-      {mensagens.map((msg, index) => {
-        const ehMinha = msg.remetente?.id === usuarioAtualId;
-        const mostrarCabecalho =
-          index === 0 || mensagens[index - 1]?.remetente?.id !== msg.remetente?.id;
+      {mensagens?.map((msg: any, index: number) => {
+        // Tenta pegar o ID de várias formas possíveis dependendo do seu DTO
+        const remetenteId = msg.remetente?.id || msg.usuarioId || msg.idUsuario;
+        const ehMinha = Number(remetenteId) === Number(usuarioAtualId);
+        
+        // Verifica o anterior para o cabeçalho
+        const anteriorId = index > 0 ? (mensagens[index - 1].remetente?.id || mensagens[index - 1].usuarioId) : null;
+        const mostrarCabecalho = index === 0 || Number(anteriorId) !== Number(remetenteId);
 
         return (
-          <MensagemItem key={msg.id} mensagem={msg} ehMinha={ehMinha} mostrarCabecalho={mostrarCabecalho} />
+          <MensagemItem 
+            key={msg.id || index} 
+            mensagem={msg} 
+            ehMinha={ehMinha} 
+            mostrarCabecalho={mostrarCabecalho} 
+          />
         );
       })}
       <div ref={fimRef} />
